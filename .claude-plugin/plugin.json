@@ -1,0 +1,15 @@
+{
+  "name": "mod-kit",
+  "version": "0.1.0",
+  "description": "Knowledge for building, auditing and maintaining Claude Code mods, themes included: a skill with measured rules so a mod looks native on Desktop and in the terminal, what Anthropic's mods pages add to the bundled plugin-authoring skill, and a read-only agent that audits a mod.",
+  "author": {
+    "name": "Victor Villegas",
+    "email": "victor.villegas@tuta.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/V-Songbird/mod-kit",
+  "repository": "https://github.com/V-Songbird/mod-kit",
+  "icon": "./assets/icon-on-light.png",
+  "engines": { "claude-code": ">=2.1.323" },
+  "keywords": ["mods", "design-system", "themes", "audit", "plugin-authoring", "claude-code"]
+}

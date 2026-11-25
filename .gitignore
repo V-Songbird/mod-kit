@@ -1,0 +1,20 @@
+# mod-kit repository visibility and local generated files.
+# Keep the skill, the agent, tests and public documentation visible.
+
+# Private working material and documentation
+.private/
+docs/tasks/
+docs/decisions/
+docs/knowledge/private/
+docs/apis/private/
+
+# Machine-local agent state; shared instructions stay visible
+**/.claude/settings.local.json
+**/.claude/memory/
+CLAUDE.local.md
+AGENTS.override.md
+
+# Dependency cache and operating-system metadata
+node_modules/
+.DS_Store
+Thumbs.db

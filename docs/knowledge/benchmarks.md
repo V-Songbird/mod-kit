@@ -1,0 +1,23 @@
+---
+type: knowledge
+summary: "Mod Kit's published measurements: none of Mod Kit itself yet, and how the skill's own measurements of the app differ from a result of the plugin; read before publishing a figure about Mod Kit."
+related_files:
+  - README.md
+  - skills/mod-native-guide/SKILL.md
+---
+
+# Mod Kit benchmarks
+
+This page holds every published measurement of Mod Kit. It extends [The numbers](../../README.md#the-numbers) on the README.
+
+## Batches
+
+No batch has been recorded. No session has compared a mod built with Mod Kit against one built without it, on any model.
+
+## What the skill's measurements are
+
+The skill carries many pixel, color and timing values. They describe the Claude desktop app and the terminal, not what Mod Kit does to a session. Each one carries an evidence label and the build it holds for, as [how Mod Kit works](how-it-works.md#evidence-labels) explains.
+
+## Losses
+
+None recorded, because no batch exists.

@@ -1,0 +1,80 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  suite:
+    name: Suite (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Preserve committed line endings
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+
+      - name: Manifest parses
+        run: node -e 'JSON.parse(require("fs").readFileSync(".claude-plugin/plugin.json","utf-8"))'
+
+      - name: Markdown anchors and README nav
+        run: node scripts/git-hooks/check-readme-nav.js
+
+      - name: Tests
+        run: node --test tests/*.test.js
+
+  private-details:
+    name: Private details
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: ${{ github.event_name == 'pull_request' }}
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        if: ${{ github.event_name == 'pull_request' }}
+        with:
+          node-version: 22
+
+      - name: Scan the pull request
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          PRIVATE_DETAILS: ${{ github.event.pull_request.head.repo.full_name == github.repository && secrets.PRIVATE_DETAILS || '' }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: node scripts/git-hooks/check-private-details.js
+
+  test:
+    name: test
+    needs: [suite, private-details]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every suite run to pass
+        env:
+          RESULT: ${{ needs.suite.result }}
+          DETAILS_RESULT: ${{ needs.private-details.result }}
+        run: test "$RESULT" = success && test "$DETAILS_RESULT" = success

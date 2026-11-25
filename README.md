@@ -21,11 +21,17 @@
 
 ## What is this?
 
-Mod Kit is a plugin for Claude Code, an AI coding assistant. It runs on Claude Code only, because mods are a Claude Code feature. It teaches the assistant how Claude Code draws its own screens, so the mods it builds match them.
+Mod Kit is a plugin for Claude Code, an AI coding assistant. It runs on Claude Code only, because mods are a Claude Code feature.
 
-A mod is a plugin that draws inside Claude Code: a band above the prompt, a pane beside the chat, a toast, a theme. You ask the assistant for one. The types say what each element accepts, but not how the Claude desktop app draws it. So the buttons touch, a meter looks foreign and the dark theme loses a color.
+It teaches the assistant how Claude Code draws its own screens, so the mods it builds match them.
 
-With Mod Kit the assistant starts from rules measured on the desktop app and the terminal. It picks the element the app itself uses and spaces it in the app's own steps. It paints with theme keys, the named colors that follow light and dark. A second helper reads a finished mod and lists what would break.
+A mod is a plugin that draws inside Claude Code: a band above the prompt, a pane beside the chat, a toast, a theme. You ask the assistant for one.
+
+The types say what each element accepts, but not how the Claude desktop app draws it. So the buttons touch, a meter looks foreign and the dark theme loses a color.
+
+With Mod Kit the assistant starts from rules measured on the desktop app and the terminal. It picks the element the app itself uses and spaces it in the app's own steps.
+
+It paints with theme keys, the named colors that follow light and dark. A second helper reads a finished mod and lists what would break.
 
 <p align="center"><img src="assets/mascot.svg" alt="Ember holds a crooked panel piece that is too wide for the slot in an app window, and its buttons touch. A ruler measures it. The piece then sits in the slot with its buttons spaced and a round meter, and Ember answers: It fits. Light and dark." width="700"></p>
 

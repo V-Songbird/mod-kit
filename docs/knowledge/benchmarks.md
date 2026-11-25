@@ -8,11 +8,22 @@ related_files:
 
 # Mod Kit benchmarks
 
-This page holds every published measurement of Mod Kit. It extends [The numbers](../../README.md#the-numbers) on the README.
+This page holds every published measurement of Mod Kit. It extends [Does it work?](../../README.md#does-it-work) on the README.
 
 ## Batches
 
 No batch has been recorded. No session has compared a mod built with Mod Kit against one built without it, on any model.
+
+Each figure comes from recorded test sessions. The figures describe those runs, not yours, and results vary between runs.
+
+### Claude Code results
+
+<!-- foundry:evidence {"platform":"Claude","status":"pending","reason":"No session measurement of Mod Kit exists.","source":"docs/knowledge/benchmarks.md"} -->
+| Model | Setup | Mods that looked native |
+| --- | --- | --- |
+| Not measured | Not measured | Not measured |
+
+No Claude Code session has been measured yet.
 
 ## What the skill's measurements are
 

@@ -12,5 +12,7 @@ Please include:
 
 You can expect an acknowledgement within 7 days.
 
+The [releases page](https://github.com/V-Songbird/mod-kit/releases) lists every version with its release notes.
+
 > [!NOTE]
 > Mod Kit runs no code of its own. Its skill and its agent guide the code the assistant writes for a mod, and that mod runs on your machine. Reporting problems privately first gives us time to fix them before others can take advantage of them. Thank you for helping keep users safe.

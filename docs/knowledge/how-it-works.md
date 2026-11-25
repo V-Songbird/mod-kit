@@ -10,9 +10,43 @@ related_files:
 
 # How Mod Kit works
 
-This page explains each part of Mod Kit and what it adds to a session. It extends [How it works](../../README.md#how-it-works) on the README.
+This page explains each part of Mod Kit and what it adds to a session. It extends [What does it do?](../../README.md#what-does-it-do) on the README.
 
-Mod Kit ships two files that the assistant reads: one skill and one agent. It has no hooks, no scripts and no settings, so nothing runs unless the assistant opens one of them.
+## Contents
+
+- [What you can do](#what-you-can-do)
+- [The skill](#the-skill)
+- [Evidence labels](#evidence-labels)
+- [The reference pages](#the-reference-pages)
+- [The audit](#the-audit)
+
+Mod Kit ships two files that the assistant reads: one skill and one agent. It has no hooks, no scripts and no settings, so nothing runs unless the assistant opens one of them. Mod Kit itself sends nothing anywhere.
+
+## What you can do
+
+| You want to | What to type |
+| --- | --- |
+| Build a mod that looks native | Describe it, for example "Make a pane that lists open pull requests" |
+| Restyle a mod you have | "Make `my-mod` look native in the desktop app and the terminal" |
+| Check a mod before you share it | "Audit the mod in `my-mod/`" |
+| Find out why a mod draws wrong | "Why do my mod's buttons touch?" |
+| Learn what the docs leave out | "What do the mods pages say that `plugin-authoring` does not?" |
+
+Mod Kit has no settings.
+
+Why you would want it:
+
+- **Native by default.** The assistant reaches for the element and theme key the app uses, not a lookalike.
+- **Measured, not guessed.** Each rule says if it was seen, drawn on a test page, read in the build or only stated.
+- **The traps, written down.** A list of places where the types promise one look and the app draws another.
+- **An audit before you share.** A read-only helper checks one mod and reports each problem with its file and line.
+
+| Part | What it does |
+| --- | --- |
+| The skill `mod-native-guide` | A skill is a guide the assistant loads when a task matches it. This one holds the rules, recipes and traps for what a mod draws, on the desktop app and in the terminal. |
+| The agent `mod-auditor` | A subagent, which is a helper the assistant starts for one job. It reads a mod's source and never edits it. |
+
+A mod is a plugin that draws inside Claude Code: a band above the prompt, a pane beside the chat, a toast, a theme. The types say what each element accepts, but not how the Claude desktop app draws it. With Mod Kit the assistant starts from rules measured on the desktop app and the terminal, and paints with theme keys, the named colors that follow light and dark.
 
 ## The skill
 

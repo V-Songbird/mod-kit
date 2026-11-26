@@ -153,7 +153,7 @@ The ones that cost the most time. Full list with evidence: `references/traps.md`
 
 ## Themes
 
-The API is in the bundled `look.md`; this section says what changed and what was seen. Nothing of a theme was seen on screen here, so each part is DOC or UNVERIFIED: ask the person for a screenshot, and to listen for sound. What three shipped theme mods do beyond `look.md`, with a checklist before shipping: `references/themes.md`.
+The API is in the bundled `look.md`; this section says what changed and what was seen. Nothing below was seen on screen here, so each part is DOC or UNVERIFIED: ask the person for a screenshot, and to listen for sound. `references/themes.md` adds what one theme's author saw and heard on Desktop 6.28899.6. What three shipped theme mods do beyond `look.md`, with a checklist before shipping: `references/themes.md`.
 
 - History (DOC, interface page): 2.1.319 replaced `$.ui.backdrop` with `$.theme.set` and `$.theme.clear`. Before 2.1.323 a backdrop named `id` instead of `scene`, and `overrideColorScheme` sat in `backdrop` as `colorScheme`. Colors reach the Code tab from 2.1.324.
 - New in the 2.1.330 bundled skill, and not in the 2.1.325 one measured here (DOC): `sound` (`ThemeSound`: an ambience and cues, numbers and never a file), `style` (`ThemeStyle`, `ThemeMessageRule`: the conversation's own rows restyled, plus four message colors that go in `colors.inputs` after `makeColors`), and a `Shader` around a scene with the `ui.pointer` event. Read `look.md`, sections Sound, Style and "A scene that answers the pointer".
@@ -165,7 +165,7 @@ The API is in the bundled `look.md`; this section says what changed and what was
 
 ## Verification
 
-Run for each changed mod: `claude plugin validate <mod>`, `claude plugin test <mod>`, and `tsc -p <mod>` once the engine has written the mod's types. Then check by hand what no check reads:
+Run for each changed mod: `claude plugin validate <mod>`, `claude plugin test <mod>`, and `tsc -p <mod>` once the engine has written the mod's types. `/reload-plugins` reads a local mod again from its folder, so a change shows without a version bump (OBS 2.1.330). The test kit's `expect` has no `toBeCloseTo`. `validate` reports it only as a `TS2339` warning, and the test then fails (OBS 2.1.330). Then check by hand what no check reads:
 
 - [ ] Every row of Buttons has a gap; every wrapping row has a `rowGap`.
 - [ ] No vertical numeric margin where a step fits.

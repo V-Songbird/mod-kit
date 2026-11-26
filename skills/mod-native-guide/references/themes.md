@@ -82,6 +82,22 @@ Pick the kind before drawing. Each costs more than the one above it.
 - **Make a click target bigger than one step.** `ui.pointer` gives `x` and `y` in steps of 1/64 of the backdrop (CODE). On a window about 960 points tall a step is about 15 points. Telar's threads were each thinner than a step, so a click named the wrong thread or none. It picks a whole turn's rows instead. Its tests had used exact heights, which hid this (INF, Telar's audit, not seen on screen).
 - **`composer` places the chat column.** The shader's `composer` is the prompt box, left, bottom, right and top from 0 to 1 (CODE). Telar frames the chat column with its width, and the frame showed on the owner's screenshot (OBS 6.28899.6). That the box follows the sidebar and a narrow window is INF.
 
+### Shader cost
+
+`look.md` says `claude plugin validate` prints each shader's cost. Run it before and after each shader change, and compare the two. Building Telar, these were the costs it printed and what brought them down. They are validator estimates on 2.1.330, read from the session records and not re-checked, and the GPU class of each figure was not recorded:
+
+| What | Cost printed |
+|---|---|
+| `theme-examples` Koi Pond, for reference | 4.97 ms |
+| a loop over `pointers` for every pixel | 3.77 ms, 9.8 ms before it was bounded |
+| two `scene` samples | 9.96 ms, which is the 30 fps cap below, so likely a sharpness drop rather than a cost (INF) |
+| a float buffer with no bound on its values | 3.28 ms |
+| `exp` and `pow` | about 1.77 ms |
+
+- What fixed them: the buffer at a quarter of the resolution, one `scene` sample, a `clamp` on the displacement, and linear ramps or `smoothstep` in place of `exp` and `pow`. Telar went from 2.76 ms to 1.34 ms, against a target of 1.5 ms.
+- Read the weak-GPU sharpness too. One extra scene read dropped it from 0.87 to 0.62, and removing it brought it back to 0.84.
+- A weak-GPU total is not a free budget. In `theme-examples`, the weak-GPU sums sit near 4.96 ms at 60 fps and 9.96 ms at 30 fps whenever sharpness drops below 2 (INF: the player lowers sharpness to fit a frame cap). Budget on the verdict, the weak-GPU sharpness, the fast-GPU ms and the fps.
+
 ## Sound
 
 - **Quiet, sparse, never a chime.** Koi Pond takes all its notes from one pentatonic scale; Falling Sand is mostly noise. Both `ask` cues slide or drop their notes fast, so they do not ring like a system chime (DOC).
@@ -92,10 +108,26 @@ Pick the kind before drawing. Each costs more than the one above it.
 - **Share one sound between twins.** Both entries of a scene take one sound, so switching between them keeps the ambience playing (DOC).
 - **Make frequent cues faint.** Falling Sand's `tool` cue is one grain, about as loud as the ambience (DOC).
 
+## Recipes from building Telar
+
+Recipes, not rules: each one fixed a look the owner rejected on Desktop 6.28899.6 (OBS). `makeColors` checks the app's text, not a scene's own figures.
+
+- **Check figure against ground by script, in both modes.** An indigo palette measured a contrast of 1.00 between ground and figure in dark mode, and an oat one 1.03. Telar's script now requires at least 2.5 in light and in dark, with a dimmer ground and a lighter figure in dark.
+- **Generate palettes by rule.** 14 grounds by 18 tints gave 109 pairs that pass the check. They held up better than palettes picked by hand.
+- **The glass frosts the chat column.** The scene shows sharp only in the side margins, blurred behind the messages. So a frame without the chat panels misjudges how heavy the scene reads.
+- **Near-transparent glass shows what is painted behind it.** Telar paints a flat ground inside the chat column, under the glass. A light band it blamed on the frame margin came from the glass's own `blur` of 48. Its glass ended at `blur` 6, opacity 0.45.
+- **Keep texture grain near 4 pt.** Threads 9 pt wide read as bricks. A grain of about 4 pt, overlapping threads and a ground layer in the cloth's own color fixed it.
+- **Nothing thinner than one row.** Threads squashed thinner than one row broke the figures into dashes. Telar keeps a minimum thickness of one row.
+- **Dose the interaction low.** The owner found the first click effect far too strong. The ring went from 14 pt to 6 pt, and the other effects were toned down.
+
 ## Staying out of the way
 
 - **A theme fault never blocks the session.** Pixel office ends every hook with `.catch(($, e, next) => next(e))`; garden does it on `tool.call` and its command (MOD). `theme-examples` wraps every background step so a fault never costs the person their prompt, and tells it in one dim transcript line (DOC).
 - **Log to debug.** `$.ui.log(text)` with no option adds a line to the transcript; `{ to: 'debug' }` keeps it off screen (DOC, types).
+- **Register commands outside the theme's try.** Telar registered `/telar` in the same `try` as `$.theme.set`. When the set failed, the command never existed (INF, Telar's audit).
+- **Say what the set answered.** `/telar sound on` said "Sound on" even when the build refused the sound. Report a refusal as a refusal (INF, Telar's audit).
+- **Cancel the timer you replace.** Telar's `clock.after` timers were never cancelled, so an old note erased a newer one (INF, Telar's audit).
+- **Never `await` inside `tool.call`.** An `await` there slows every tool the session runs. Read the state once, in the backdrop hook (INF, Telar's audit).
 - **Serialize state changes.** Pixel office runs each read-change-write of its atoms through one promise queue, so events and its timer never race (MOD). Its atoms carry a `shape` tag, so a reload declines older values (MOD; `Shaped` in the types).
 - **Say what is stored.** `theme-examples` stores the choice per project in `$.store`, with linked worktrees sharing the main tree's key, and per session for the 200 sessions that chose last. Its README lists every value it keeps (DOC).
 
@@ -109,5 +141,8 @@ Pick the kind before drawing. Each costs more than the one above it.
 - [ ] Each redraw carries its animations' phase; no timed switch is under 400 ms.
 - [ ] Reduced motion shows a finished picture; a `Shader` scene's still is one too.
 - [ ] Every target a click picks is larger than a 1/64 step, and a hold is read as `down` 1 with `gone` 0.
+- [ ] `claude plugin validate` ran before and after the last shader change, and neither the cost nor the weak-GPU sharpness got worse without a reason.
+- [ ] Commands register outside the theme's `try`; no timer is left running when a newer one replaces it; no `await` sits in `tool.call`.
+- [ ] Figure and ground reach the contrast you chose in light and in dark, checked by script.
 - [ ] Light and dark were both looked at, with a long code block and a larger text size.
 - [ ] `$.theme.clear()` runs only on the person's request.

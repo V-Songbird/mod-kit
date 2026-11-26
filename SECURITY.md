@@ -15,4 +15,4 @@ You can expect an acknowledgement within 7 days.
 The [releases page](https://github.com/V-Songbird/mod-kit/releases) lists every version with its release notes.
 
 > [!NOTE]
-> Mod Kit runs no code of its own. Its skill and its agent guide the code the assistant writes for a mod, and that mod runs on your machine. Reporting problems privately first gives us time to fix them before others can take advantage of them. Thank you for helping keep users safe.
+> Mod Kit runs one script of its own, the Desktop preview, only when the assistant runs it. It reads your installed Claude Desktop and its look settings, never its tokens, serves them on `127.0.0.1` only and sends nothing anywhere. Its skill and its agent guide the code the assistant writes for a mod, and that mod runs on your machine. Reporting problems privately first gives us time to fix them before others can take advantage of them. Thank you for helping keep users safe.

@@ -14,6 +14,7 @@ How Claude draws itself, and what a mod has to write so the host draws it the sa
 | Claude Desktop (Code tab) | 5.11492.5 | its renderer bundle, read and drawn on a test page |
 | Engine inside Desktop | 2.1.325 | its binary and its bundled `plugin-authoring` types |
 | Native app and mods on screen | Desktop 4.16336 and 5.11492.5 | 51 screenshots, light and dark, measured to the pixel |
+| Desktop preview | 6.28899.6, engine 2.1.330 | the installed app's own code on a loopback page (Desktop preview, below) |
 | Docs pages | 2026-11-24 | the nine mods pages, compared with `plugin-authoring` 2.1.330 (`references/doc-only.md`) |
 
 On 2026-11-24 the installed build was Desktop 6.28899.6 with engine 2.1.330. No measurement here was repeated on it. Building one theme added OBS on that build for themes alone: a `Shader` over an `Svg` draws in light and in dark, the Svg's `@media` follows the mode, the glass frosts the chat column, and the shader plays live (`references/themes.md`). Sound, the click effect and reduced motion stay unseen there. Every px, color and behavior below holds for the build its label names. Check `$.session.version()` (or `claude --version`) and treat a value on a newer build as likely, not certain.
@@ -48,7 +49,7 @@ A mod cannot write CSS, fonts, pixels or DOM. It returns a tree of `Box`, `Text`
 5. **Space with steps, color with keys, size with roles** (tables below). No raw px, no hex, no all-caps.
 6. **Write every state**: loading, empty, zero, error, narrow, both themes, both surfaces.
 7. **Word it natively**: sentence case, "…", curly apostrophes, the interface language.
-8. **Run the checks** under Verification. Tests and checks never prove a look.
+8. **Run the checks** under Verification, and the Desktop preview for a Desktop look. Tests, checks and the preview never prove a look.
 9. **Get screenshots**: Desktop light and dark, and the terminal. Record what was and was not seen.
 
 For a new control, layout or theme look nobody has approved, show three mockups first, or one sheet that compares the options, and let the person choose. Building one theme, the looks nobody asked for were undone, and the ones picked from a mockup or a comparison sheet stayed (OBS 6.28899.6). For a material or a texture, ask for a reference photo before the first draft.
@@ -163,6 +164,24 @@ The API is in the bundled `look.md`; this section says what changed and what was
 - Third-party providers on Desktop 5.11492.5 or earlier keep the app's colors (DOC). To take colors off: `references/doc-only.md`, interface.
 - Recoloring Claude is for a person who asks for it. Never set a theme as a side effect of another mod's job.
 
+## Desktop preview
+
+`scripts/desktop-preview/preview.mjs` draws a tree, and a theme if given, with the Claude Desktop app installed on this computer: its own DOM builder, site CSS, shapers, theme applier, glass and stylesheets. It saves a PNG and a JSON report per mode, then exits. Find the plugin's files through `${CLAUDE_PLUGIN_ROOT}`, or resolve `../../` from this file, and put that folder in place of `<plugin root>`. It needs Node.js 22.4 or later, for its built-in `WebSocket`, and Edge, Chrome or Chromium (`PREVIEW_BROWSER` names another).
+
+```bash
+node "<plugin root>/scripts/desktop-preview/preview.mjs" --tree tree.json --site band --shots <dir>
+```
+
+- `--tree <file>`: a tree as the test kit prints it, or `{ "tree": … }`. Without it, a test mod draws. Get a mod's tree from a scratch test in a copy of the mod: mount the site with `$.ui.mount({ plugin, surface: 'desktop', component, props })`, take `await site.find({ type: 'Box' })`, print it with `JSON.stringify` between markers, and run `claude plugin test`. Tried on one band mod only.
+- `--site pane|band`: the Pane in a chat column (default) or the `AbovePrompt` band.
+- `--theme <file>`: the `$.theme.set` argument, `colors` and `backdrop`, plus `backdropTree`, the Svg node the Backdrop hook returns. Print it from the `$`-free functions that build the theme (Verification, below).
+- `--settings user`: this computer's Desktop look: mode, interface font, contrast, language, and the palette the app keeps for the active mod theme. It reads a fixed list of keys and never the account ids or tokens in the same files. A theme that picks colors per session shows the newest session's palette.
+- `--modes light,dark`, `--size 1628x1348`; without `--shots` it serves `http://127.0.0.1:4173/preview.html` for the browser pane.
+
+Each run reads the app's `ion-dist.asar` into a cache under the system temp folder and refuses a cache inside a Git work tree. Never copy that cache, or anything from it, into a repository or a mod. It finds every piece by stable strings; when a Desktop update moves one, it fails with that piece's name. Verified on the Microsoft Store install of Desktop 6.28899.6 on Windows. The macOS path, a non-Store install and Linux are not verified; pass `--asar <path>`.
+
+What it proves is HARNESS, never OBS. On 6.28899.6 it reproduced the owner's captures where they could judge: Input 183 px, Buttons 28 px with the same fills, and a real band card of 40 px. The trial before it also matched that band's meter, 6 × 76 px. `--theme` was run with one theme, Loom, and its glass was judged like the app's by eye against the running app, not measured. The chat panel spans the window, with the reading column at the app's `--transcript-measure`, 768 px. The theme's glass tints and blurs that column and fades out toward the sides, as in the app. With no sidebar and no session panel drawn, the scene shows on both sides, where the app would cover part of it. It does not draw the window chrome, Loom-style `Shader`s (the still Svg only), hover, focus, the Code tab's per-plugin band button, or the display scale. It draws the tree as given and skips Desktop's own check of the wire tree, so a refused tree can still draw here.
+
 ## Verification
 
 Run for each changed mod: `claude plugin validate <mod>`, `claude plugin test <mod>`, and `tsc -p <mod>` once the engine has written the mod's types. `/reload-plugins` reads a local mod again from its folder, so a change shows without a version bump (OBS 2.1.330). That holds for a mod loaded from a folder. One installed from a marketplace runs its cached copy until its version is bumped and updated (`references/themes.md`, Setting the theme). The test kit's `expect` has no `toBeCloseTo`. `validate` reports it only as a `TS2339` warning, and the test then fails (OBS 2.1.330).
@@ -179,8 +198,8 @@ What building one theme taught about these checks (OBS 2.1.330 unless marked):
 - Keep the function that builds a scene free of `$`. Then `node --experimental-strip-types` can import it in a scratch script, and one run draws every variant in light and dark and prints a contrast table. On Windows the import takes a `file:///` URL.
 - No tool here plays a `Shader`. A preview shows the still alone, so say that each shader effect was not seen.
 - After an update, list the events, `$` calls and components of the old and new `claude-code.d.ts` with the TypeScript compiler and compare the two lists. 2.1.317 to 2.1.330 went from 147 to 167 events and from 88 to 102 calls.
-- To preview a scene outside the app, render its Svg to PNG with headless Edge and its own `--user-data-dir`; the browser pane cannot open `file://`. Force dark by rewriting `@media (prefers-color-scheme: dark)` to `@media all`, and light by rewriting it to `@media not all`.
-- A preview lacks the chat panels and the glass, so it misleads. A blind critic of such frames never converged in four rounds. Computer use cannot drive Claude's own window, so only the person's screenshot verifies a look.
+- To preview a scene outside the app, run the Desktop preview with `--theme`. It draws the scene, the glass and the theme's colors with the app's own code. A bare Svg rendered alone lacks the chat panels and the glass, so it misleads: a blind critic of such frames never converged in four rounds.
+- Computer use cannot drive Claude's own window, so only the person's screenshot verifies a look. The Desktop preview narrows what to ask for; it never replaces that screenshot.
 
 Then check by hand what no check reads:
 

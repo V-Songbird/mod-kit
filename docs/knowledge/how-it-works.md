@@ -20,7 +20,7 @@ This page explains each part of Mod Kit and what it adds to a session. It extend
 - [The reference pages](#the-reference-pages)
 - [The audit](#the-audit)
 
-Mod Kit ships two files that the assistant reads: one skill and one agent. It has no hooks, no scripts and no settings, so nothing runs unless the assistant opens one of them. Mod Kit itself sends nothing anywhere.
+Mod Kit ships one skill and one agent that the assistant reads, and one script, the Desktop preview. It has no hooks and no settings, so nothing runs unless the assistant starts it. Mod Kit itself sends nothing anywhere.
 
 ## What you can do
 
@@ -45,6 +45,7 @@ Why you would want it:
 | --- | --- |
 | The skill `mod-native-guide` | A skill is a guide the assistant loads when a task matches it. This one holds the rules, recipes and traps for what a mod draws, on the desktop app and in the terminal. |
 | The agent `mod-auditor` | A subagent, which is a helper the assistant starts for one job. It reads a mod's source and never edits it. |
+| The Desktop preview | A script the skill runs to draw a mod or a theme with the Claude desktop app installed on your computer, without opening it. It saves pictures the assistant can measure. It is not the app, so a screenshot still decides. |
 
 A mod is a plugin that draws inside Claude Code: a band above the prompt, a pane beside the chat, a toast, a theme. The types say what each element accepts, but not how the Claude desktop app draws it. With Mod Kit the assistant starts from rules measured on the desktop app and the terminal, and paints with theme keys, the named colors that follow light and dark.
 

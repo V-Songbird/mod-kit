@@ -1,6 +1,6 @@
 # Themes: what shipped theme mods teach
 
-What three published theme mods do that the bundled `look.md` does not say. Read `look.md` first: it holds the API, `makeColors`, the scene rules, sound and style. This page never repeats it. Nothing here was seen on screen by this project; each line is DOC or MOD, and a look still needs the person's screenshot in light and dark, and their ears for sound.
+What three published theme mods do that the bundled `look.md` does not say, and what building one theme taught. Read `look.md` first: it holds the API, `makeColors`, the scene rules, sound and style. This page never repeats it. Most lines are DOC or MOD. The lines from Telar are CODE, read in the 2.1.330 types, or OBS, seen or heard by Telar's author. A look still needs the person's screenshot in light and dark, and their ears for sound.
 
 This page is written by hand, like `doc-only.md`, and is not regenerated.
 
@@ -11,6 +11,8 @@ This page is written by hand, like `doc-only.md`, and is not regenerated.
 | `theme-examples`, in `anthropics/claude-plugins-official` | Apache-2.0 | `0fbfda5`, 2026-11-25 | none; it tries the current shape and two older ones (INF) | DOC |
 | `cktang88/claude-garden-theme` | MIT | `d3cb730`, 2026-11-19 | engine 2.1.325, macOS only | MOD |
 | `spaut33/claude-pixel-office` | MIT | `9ccab43`, 2026-11-23 | Claude Code 2.1.330 | MOD |
+
+Telar, a loom with a `Shader`, glass and sound, was built against engine 2.1.330 on Desktop 6.28899.6 on Windows, on 2026-11-26. Its lines name what was seen and what was only read.
 
 `theme-examples` is Anthropic's, so its source and README count as DOC. **MOD** means: stated in a community mod's source or README at the commit named, and not measured here. Ideas are restated in this page's own words; no code is copied.
 
@@ -76,11 +78,17 @@ Pick the kind before drawing. Each costs more than the one above it.
 - **The language is `claude-code/shader`.** A file declares `buffer`s stepped with `dt`, reads `pointers`, `time` and `size`, and keeps small data in a `table` (DOC, `theme-examples` Ripple Tank). The file is a subset of TypeScript with no `while` loops, no recursion and no imports from other files (DOC, interface page). `claude plugin validate` prints each shader's cost (DOC, `look.md`).
 - **Mind the published limits.** A `scene` name is letters, digits, `_` and `-`, up to 64 characters. A `Shader` takes eight `values` at most. `ui.pointer` hears two clicks a second, and the app drops the rest. The reference page states no limit on a scene's size (DOC, reference page, Limits).
 - **Send state through `values`, never a stream.** A redraw that changes only `values` keeps the shader running and eases it (DOC, types).
+- **A held press is `down` 1 with `gone` 0.** `down` stays 1 after the press lifts, and `gone` counts the seconds since. `where.zw` is the last frame's place, so a drag is `where.xy` minus `where.zw` (CODE, `Pointer` in the 2.1.330 types).
+- **Make a click target bigger than one step.** `ui.pointer` gives `x` and `y` in steps of 1/64 of the backdrop (CODE). On a window about 960 points tall a step is about 15 points. Telar's threads were each thinner than a step, so a click named the wrong thread or none. It picks a whole turn's rows instead. Its tests had used exact heights, which hid this (INF, Telar's audit, not seen on screen).
+- **`composer` places the chat column.** The shader's `composer` is the prompt box, left, bottom, right and top from 0 to 1 (CODE). Telar frames the chat column with its width, and the frame showed on the owner's screenshot (OBS 6.28899.6). That the box follows the sidebar and a narrow window is INF.
 
 ## Sound
 
 - **Quiet, sparse, never a chime.** Koi Pond takes all its notes from one pentatonic scale; Falling Sand is mostly noise. Both `ask` cues slide or drop their notes fast, so they do not ring like a system chime (DOC).
 - **Pitch a press by where it lands.** Its `click` cues pick a note by the press's place from left to right (DOC).
+- **A `click` cue cannot keep to one zone.** It plays for a click anywhere on the bare backdrop. Telar wanted sound on the cloth alone, so it dropped its `click` cue (OBS 6.28899.6).
+- **The `click` cue plays when the click ends.** A shader sees the press on its first frame, before the sound. Telar's string moved on press and sounded on release, and the owner heard that as a delay. It now shows the pluck on release, as `gone` starts, and the sound lines up (OBS, by ear, 6.28899.6).
+- **`$.audio.play` plays nothing on Windows.** Engine 2.1.330 logs "no audio player on windows; not played" and raises no error (CODE, not heard). A theme's sound goes in `sound`.
 - **Share one sound between twins.** Both entries of a scene take one sound, so switching between them keeps the ambience playing (DOC).
 - **Make frequent cues faint.** Falling Sand's `tool` cue is one grain, about as loud as the ambience (DOC).
 
@@ -100,5 +108,6 @@ Pick the kind before drawing. Each costs more than the one above it.
 - [ ] The scene is under 131,072 characters at its largest state, and every id has a hyphen.
 - [ ] Each redraw carries its animations' phase; no timed switch is under 400 ms.
 - [ ] Reduced motion shows a finished picture; a `Shader` scene's still is one too.
+- [ ] Every target a click picks is larger than a 1/64 step, and a hold is read as `down` 1 with `gone` 0.
 - [ ] Light and dark were both looked at, with a long code block and a larger text size.
 - [ ] `$.theme.clear()` runs only on the person's request.

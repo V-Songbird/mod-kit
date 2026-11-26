@@ -51,7 +51,7 @@ A mod cannot write CSS, fonts, pixels or DOM. It returns a tree of `Box`, `Text`
 8. **Run the checks** under Verification. Tests and checks never prove a look.
 9. **Get screenshots**: Desktop light and dark, and the terminal. Record what was and was not seen.
 
-For a new control, layout or theme look nobody has approved, show three mockups first, or one sheet that compares the options, and let the person choose. Building one theme, the looks nobody asked for were undone, and the ones picked from a mockup or a comparison sheet stayed (OBS 6.28899.6).
+For a new control, layout or theme look nobody has approved, show three mockups first, or one sheet that compares the options, and let the person choose. Building one theme, the looks nobody asked for were undone, and the ones picked from a mockup or a comparison sheet stayed (OBS 6.28899.6). For a material or a texture, ask for a reference photo before the first draft.
 
 ## Which site
 
@@ -165,7 +165,7 @@ The API is in the bundled `look.md`; this section says what changed and what was
 
 ## Verification
 
-Run for each changed mod: `claude plugin validate <mod>`, `claude plugin test <mod>`, and `tsc -p <mod>` once the engine has written the mod's types. `/reload-plugins` reads a local mod again from its folder, so a change shows without a version bump (OBS 2.1.330). The test kit's `expect` has no `toBeCloseTo`. `validate` reports it only as a `TS2339` warning, and the test then fails (OBS 2.1.330).
+Run for each changed mod: `claude plugin validate <mod>`, `claude plugin test <mod>`, and `tsc -p <mod>` once the engine has written the mod's types. `/reload-plugins` reads a local mod again from its folder, so a change shows without a version bump (OBS 2.1.330). That holds for a mod loaded from a folder. One installed from a marketplace runs its cached copy until its version is bumped and updated (`references/themes.md`, Setting the theme). The test kit's `expect` has no `toBeCloseTo`. `validate` reports it only as a `TS2339` warning, and the test then fails (OBS 2.1.330).
 
 What building one theme taught about these checks (OBS 2.1.330 unless marked):
 
@@ -173,6 +173,12 @@ What building one theme taught about these checks (OBS 2.1.330 unless marked):
 - The test kit cannot raise `ui.pointer`. Test the pure function the hook calls.
 - Type a test's body as `TestBody`. `validate` rejected `Parameters<typeof test>`.
 - `tsc` needs the types the engine writes for the mod. It lays them in `.claude-plugin/types/` each time it loads a mod from a folder being written in: this session's mods folder, a `--plugin-dir` or a `CLAUDE_CODE_PLUGIN_DIRS` folder (DOC, `reference.md`). When `claude -p --plugin-dir` failed on an expired login, no types were written and `tsc` never ran. Report `tsc` as not run until a session has loaded the mod.
+- Search every `validate` run for `error TS`. It printed type errors and still ended with "Validation passed". In a shader file, vector arithmetic and `mix` are typed as `number`, so wrap the result in `vec2(...)` or `vec4(...)`.
+- `claude plugin test` does not read the shader. It passed with 19 tests while `validate` refused the shader for a name declared twice. Run `validate` after every shader edit.
+- Run `tsc` with `--noEmit`. A plain run wrote six `.js` files beside the sources, and they doubled the counts of a color check.
+- Keep the function that builds a scene free of `$`. Then `node --experimental-strip-types` can import it in a scratch script, and one run draws every variant in light and dark and prints a contrast table. On Windows the import takes a `file:///` URL.
+- No tool here plays a `Shader`. A preview shows the still alone, so say that each shader effect was not seen.
+- After an update, list the events, `$` calls and components of the old and new `claude-code.d.ts` with the TypeScript compiler and compare the two lists. 2.1.317 to 2.1.330 went from 147 to 167 events and from 88 to 102 calls.
 - To preview a scene outside the app, render its Svg to PNG with headless Edge and its own `--user-data-dir`; the browser pane cannot open `file://`. Force dark by rewriting `@media (prefers-color-scheme: dark)` to `@media all`, and light by rewriting it to `@media not all`.
 - A preview lacks the chat panels and the glass, so it misleads. A blind critic of such frames never converged in four rounds. Computer use cannot drive Claude's own window, so only the person's screenshot verifies a look.
 
@@ -211,4 +217,4 @@ A look is verified only by a screenshot of the real surface: Desktop light, Desk
 | `references/terminal.md` | the terminal side: elements, themes, framing, the CLI's own glyph and hint conventions |
 | `references/recipes.md` | you build a meter, tooltip, section, row, card, toggle, field, footer chip, empty state |
 | `references/traps.md` | something does not draw as the types promise, or before choosing an approach |
-| `references/themes.md` | you build or review a theme: setting it so it shows, the backdrop hook, motion across redraws, light and dark, shaders and their cost, sound, recipes for contrast, glass and texture |
+| `references/themes.md` | you build or review a theme: setting it so it shows, the backdrop hook, motion across redraws, light and dark, links under glass, shaders, what restarts or rests one, what its cost is made of, sound, recipes for contrast, palettes, glass and texture |

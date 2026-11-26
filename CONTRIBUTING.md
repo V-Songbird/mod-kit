@@ -29,8 +29,9 @@ skills/
     ├── SKILL.md        # the workflow, the rules and the quick tables
     └── references/     # 18 detail pages the skill opens on demand
 scripts/
+├── desktop-preview/    # the Desktop preview the skill runs on request
 └── git-hooks/          # the commit gates
-tests/                  # node:test suite for the commit gates, with fixtures/
+tests/                  # node:test suite for the commit gates and the preview, with fixtures/
 CONTRIBUTING.md         # this file
 SECURITY.md             # how to report a vulnerability
 LICENSE                 # MIT
@@ -50,7 +51,9 @@ The README is the front page. The pages under `docs/knowledge/` hold the detail 
 
 **Most reference pages are generated.** The maintainer measures Claude and regenerates `skills/mod-native-guide/references/` from those measurements; `doc-only.md` and `themes.md` are the exceptions, written by hand. A correction to a generated page is welcome as an issue or a pull request, and lands in the next regeneration.
 
-**There are no hooks.** Mod Kit ships text the assistant reads. Keep it that way unless an issue agrees otherwise.
+**There are no hooks.** Mod Kit ships text the assistant reads, and one script the skill runs on request: the Desktop preview in `scripts/desktop-preview/`. Keep it that way unless an issue agrees otherwise.
+
+**The preview never ships the app.** It reads the user's installed Claude Desktop on every run, into a cache outside any Git work tree. No file from that cache goes into this repository, a test fixture or an issue. Its settings reader keeps a fixed list of keys, and its server answers only `127.0.0.1`. Test fixtures are written by hand.
 
 **Published figures follow one rule.** Each result names its host, model, date and sample size. Losses and limits stay, a host with no results shows `Not measured`, and a result from one host never stands for another.
 

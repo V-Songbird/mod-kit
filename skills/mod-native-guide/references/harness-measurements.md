@@ -4,6 +4,13 @@ What Desktop's own DOM builder and stylesheet draw for a mod tree, measured in a
 
 Label **HARNESS**: the engine chunk's builder, the app's three stylesheets, and the site wrapper copied from the engine's own React wrapper, mounted on a loopback page. It is the real code, not the real app: the Code tab's own page CSS, the pane chrome and the schema check before the builder are not in it. How to run it: regenerate.md (kept in the source repository, not shipped), step 10. Cases: scripts/harness/harness-cases.js (kept in the source repository, not shipped).
 
+## Desktop 6.28899.6: two corrections
+
+Found with the Desktop preview (`scripts/desktop-preview/`) on Desktop 6.28899.6.0, engine 2.1.330. The 5.11492 values below stay as measured.
+
+- **The interface font inside the desktop app is the system font, not `anthropic-sans`** (CODE, HARNESS). With no stored choice the app resolves its font to `system` when the user agent is the desktop app's, and sets `data-font="system"` on `<html>`. That maps the sans face to the system face, Segoe UI on Windows. `anthropic-sans` is the web default. The 7.55 px `ch` on this page is the system face at 14 px; `anthropic-sans` gives 8.4 px, and an Input 273 px wide instead of 183 px. The 5.11492 harness got the right widths only because it measured before its web font loaded.
+- **The compact density is gone** (CODE, HARNESS). The 6.28899.6 stylesheets have no `data-density` selector, so compact draws the same as comfortable. Read the compact columns below as 5.11492 history.
+
 ## Which variant is the real app
 
 **Desktop draws at `comfortable` density with the second color layer.** Evidence, in order of strength:
@@ -59,7 +66,7 @@ Default and `secondary` are the same drawing. Only `primary` and `plain` differ.
 | `heading` | 15 / 20 | 14 / 18 |
 | `title` | 22 / 28, display face | 20 / 25 |
 
-Weights as drawn: `medium` 500, `semibold` 580, `bold={true}` 580 (it is read as semibold). `mono` is `anthropic-mono` at the same size. Sans is `anthropic-sans`.
+Weights as drawn: `medium` 500, `semibold` 580, `bold={true}` 580 (it is read as semibold). `mono` is `anthropic-mono` at the same size. Sans is the system face inside the desktop app and `anthropic-sans` on the web (6.28899.6, section above).
 
 A Text whose string holds a run of two or more spaces is drawn as a grid line: mono face, `white-space: pre`, `display: block`. Its sibling lines in the same column Box go mono too, including a plain sentence (HARNESS, case `grid-mono`). Keep column-aligned text in its own Box.
 

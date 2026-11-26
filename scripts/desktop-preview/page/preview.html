@@ -1,0 +1,24 @@
+<!doctype html>
+<html class="cds-root" lang="en" data-theme="claude" data-color-version="v2" data-platform="desktop" data-cds-fizzy-lake="color panels type">
+<head>
+<meta charset="utf-8">
+<title>Desktop preview</title>
+<style>
+  /* Page layout only: a window-sized frame, a chat panel that spans it, and the reading column inside.
+     The veil host is the whole panel, as in the app: its glass fades from the column to clear at the sides,
+     measured against --transcript-measure. The real window chrome is not drawn. */
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--cds-page-bg); color: var(--cds-text-primary); font-family: var(--cds-font-sans); }
+  .dframe-root { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+  .dframe-content { position: relative; isolation: isolate; width: 100%; height: 100%; }
+  .preview-panel { position: absolute; inset: 0; }
+  .preview-column { position: relative; margin: 0 auto; width: var(--transcript-measure, 768px); max-width: 100%; height: 100%; box-sizing: border-box; padding: 32px 24px; }
+  #out { display: none; }
+</style>
+</head>
+<body>
+<div class="dframe-root"><div class="dframe-content"><div class="engine-veil-host preview-panel" id="panel"><div class="preview-column" id="column"></div></div></div></div>
+<pre id="out"></pre>
+<script type="module" src="/preview.js"></script>
+</body>
+</html>

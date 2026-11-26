@@ -70,6 +70,7 @@ The pixel and color values inside Mod Kit describe the app's own screens. They a
 
 - **Measurements have a build.** On a newer Claude Code, treat a value as likely, not certain. [The evidence labels](docs/knowledge/how-it-works.md#evidence-labels) name the builds.
 - **A look is proven only on screen.** Check the desktop app in light and dark, and the terminal, with screenshots.
+- **The preview is not the app.** It draws a mod with your installed desktop app's code, so the assistant can check it first. It skips the window, hover and shader effects. [How it works](docs/knowledge/how-it-works.md#what-you-can-do) says more.
 - **Some rules are not yet seen.** A rule labelled `UNVERIFIED` rests on inference. Do not ship it without a screenshot.
 - **The audit reads source only.** `mod-auditor` cannot judge how a mod looks. It lists what only screenshots can prove.
 

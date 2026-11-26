@@ -82,7 +82,7 @@ Each value names its build. The measurements ran on Claude Desktop 5.11492.5 wit
 
 ## The reference pages
 
-The skill keeps its detail in 17 pages under [references/](../../skills/mod-native-guide/references/). The assistant opens only the page a task needs.
+The skill keeps its detail in 18 pages under [references/](../../skills/mod-native-guide/references/). The assistant opens only the page a task needs.
 
 | Page | Holds |
 | --- | --- |
@@ -95,8 +95,9 @@ The skill keeps its detail in 17 pages under [references/](../../skills/mod-nati
 | `codetab-surfaces.md`, `composer-and-pr.md` | What sits beside a mod in the Code tab |
 | `engine-behaviour.md`, `api-behaviour.md`, `mounts-and-transcript.md` | When a site redraws, its limits, and how transcript rows are framed |
 | `terminal.md` | The terminal side: elements, themes and the CLI's own conventions |
+| `themes.md` | What three published theme mods do beyond the bundled guide, and a checklist before shipping a theme |
 
-The pages were written in the repository where the measurements were taken. Where they name "the owner" or "the project checks", read your own project's reviewer and checks.
+The pages were written in the repository where the measurements were taken. `themes.md` is the exception: it was written from Anthropic's `theme-examples` and two community theme mods, and nothing in it was measured. Where they name "the owner" or "the project checks", read your own project's reviewer and checks.
 
 ## The audit
 

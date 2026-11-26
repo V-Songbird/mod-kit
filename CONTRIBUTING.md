@@ -27,7 +27,7 @@ agents/
 skills/
 └── mod-native-guide/
     ├── SKILL.md        # the workflow, the rules and the quick tables
-    └── references/     # 17 detail pages the skill opens on demand
+    └── references/     # 18 detail pages the skill opens on demand
 scripts/
 └── git-hooks/          # the commit gates
 tests/                  # node:test suite for the commit gates, with fixtures/
@@ -48,7 +48,7 @@ The README is the front page. The pages under `docs/knowledge/` hold the detail 
 
 **Every claim carries an evidence label and a build.** A value seen on screen is `OBS`; one read in the build is `CODE`; one only stated by a page is `DOC`. A change keeps the label honest and names the build it was checked on. A look is proven only by a screenshot: the desktop app in light and dark, and the terminal.
 
-**Most reference pages are generated.** The maintainer measures Claude and regenerates `skills/mod-native-guide/references/` from those measurements; `doc-only.md` is the exception. A correction to a generated page is welcome as an issue or a pull request, and lands in the next regeneration.
+**Most reference pages are generated.** The maintainer measures Claude and regenerates `skills/mod-native-guide/references/` from those measurements; `doc-only.md` and `themes.md` are the exceptions, written by hand. A correction to a generated page is welcome as an issue or a pull request, and lands in the next regeneration.
 
 **There are no hooks.** Mod Kit ships text the assistant reads. Keep it that way unless an issue agrees otherwise.
 

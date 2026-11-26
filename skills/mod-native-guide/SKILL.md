@@ -24,6 +24,7 @@ Every claim carries one label. Trust them in this order.
 - **HARNESS**: drawn by Desktop's own tree builder and stylesheets on a test page, outside the app, and measured. Real code, not the real app.
 - **CODE**: read in the binary of the build named. Re-check after an update.
 - **DOC**: stated by Anthropic's pages or the bundled skill, and not measured.
+- **MOD**: stated in a community mod's source or README at the commit named, and not measured (`references/themes.md` only).
 - **INF**: inferred from code or records.
 - **UNVERIFIED**: stated by types or inferred, and nobody has seen it on screen. Never ship a look that rests on one without a screenshot.
 
@@ -152,7 +153,7 @@ The ones that cost the most time. Full list with evidence: `references/traps.md`
 
 ## Themes
 
-The API is in the bundled `look.md`; this section says what changed and what was seen. Nothing of a theme was seen on screen here, so each part is DOC or UNVERIFIED: ask the person for a screenshot, and to listen for sound.
+The API is in the bundled `look.md`; this section says what changed and what was seen. Nothing of a theme was seen on screen here, so each part is DOC or UNVERIFIED: ask the person for a screenshot, and to listen for sound. What three shipped theme mods do beyond `look.md`, with a checklist before shipping: `references/themes.md`.
 
 - History (DOC, interface page): 2.1.319 replaced `$.ui.backdrop` with `$.theme.set` and `$.theme.clear`. Before 2.1.323 a backdrop named `id` instead of `scene`, and `overrideColorScheme` sat in `backdrop` as `colorScheme`. Colors reach the Code tab from 2.1.324.
 - New in the 2.1.330 bundled skill, and not in the 2.1.325 one measured here (DOC): `sound` (`ThemeSound`: an ambience and cues, numbers and never a file), `style` (`ThemeStyle`, `ThemeMessageRule`: the conversation's own rows restyled, plus four message colors that go in `colors.inputs` after `makeColors`), and a `Shader` around a scene with the `ui.pointer` event. Read `look.md`, sections Sound, Style and "A scene that answers the pointer".
@@ -199,3 +200,4 @@ A look is verified only by a screenshot of the real surface: Desktop light, Desk
 | `references/terminal.md` | the terminal side: elements, themes, framing, the CLI's own glyph and hint conventions |
 | `references/recipes.md` | you build a meter, tooltip, section, row, card, toggle, field, footer chip, empty state |
 | `references/traps.md` | something does not draw as the types promise, or before choosing an approach |
+| `references/themes.md` | you build or review a theme: setting it so it shows, the backdrop hook, motion across redraws, light and dark, shaders, sound |

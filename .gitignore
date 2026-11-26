@@ -14,6 +14,10 @@ docs/apis/private/
 CLAUDE.local.md
 AGENTS.override.md
 
+# Plugin-local session state written at run time, never published
+.foreman/
+ROADMAP.jsonl
+
 # Dependency cache and operating-system metadata
 node_modules/
 .DS_Store

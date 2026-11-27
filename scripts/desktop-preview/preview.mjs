@@ -8,12 +8,14 @@
 //                         [--timeline <timeline.json> | --times <ms,ms,...>] [--reduced-motion] [--video]
 //                         [--shots <dir>] [--modes light,dark] [--size 1628x1348]
 //                         [--asar <ion-dist.asar>] [--cache <dir>] [--port <n>]
-//                         [--shader <plugin dir> [--frames <n,n,...>]]
+//                         [--shader <plugin dir> [--frames <n,n,...> | --click <x,y,tMs[,holdMs]>]]
 // With --shots it captures each mode and exits; without it, it serves until stopped.
 // With --timeline or --times it captures one PNG per frame, with every animation paused at the frame's time.
 // With --shader it asks the CLI for the Shader the plugin's Backdrop hook draws and plays it in the app's own worker.
 // With --frames it steps that worker on a fixed clock and saves the canvas at each frame number after the first drawn
 // one, as shader-<mode>-<n>.png, with shader-frames-<mode>.json holding each frame's time, size, center and hash.
+// With --click it presses a pointer at x,y (CSS px of the stage) at tMs on the page clock, holds it holdMs (100 when
+// left out), then releases and lifts it, as PointerBackdrop does; the report keeps the frost cell under it over time.
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
@@ -107,6 +109,14 @@ export function parseFrames(text) {
   const parts = text.split(',').map((s) => s.trim()), list = parts.map(Number)
   if (parts.some((s) => !/^\d+$/.test(s)) || new Set(list).size !== list.length) throw new Error(`--frames takes distinct whole frame numbers, 0 or more, such as 0,30,60; not ${text}`)
   return list
+}
+
+/** --click: x,y in CSS px of the stage, tMs on the page clock, and an optional holdMs, each a number 0 or more. */
+export function parseClick(text) {
+  const parts = text.split(',').map((s) => s.trim())
+  if (parts.length < 3 || parts.length > 4 || parts.some((s) => !/^\d+(\.\d+)?$/.test(s))) throw new Error(`--click takes x,y,tMs or x,y,tMs,holdMs, numbers 0 or more, such as 480,300,2000,500; not ${text}`)
+  const [x, y, t, hold = 100] = parts.map(Number)
+  return { x, y, t, hold }
 }
 
 /**
@@ -242,11 +252,13 @@ async function main(argv) {
   console.log(`cache ${cache}`)
   const input = readInput({ tree: arg('tree'), site: arg('site'), theme: arg('theme'), settings: arg('settings'), timeline: arg('timeline'), times: arg('times') })
   if (arg('frames') && !arg('shader')) throw new Error('--frames needs --shader')
+  if (arg('click') && !arg('shader')) throw new Error('--click needs --shader')
+  if (arg('click') && arg('frames')) throw new Error('--click takes no --frames: the page clock runs free')
   if (arg('shader')) {
     if (input.frames) throw new Error('--shader takes no --timeline or --times')
     if (!found.shader) throw new Error('anchor "shader-worker" not found: no PointerBackdrop chunk names an existing /assets/shader-worker-*.js in this Desktop build')
     const s = await fetchShader({ pluginDir: path.resolve(arg('shader')), theme: input.theme })
-    input.shader = { ...s, worker: found.shader.worker, desktop: version, frames: arg('frames') ? parseFrames(arg('frames')) : null }
+    input.shader = { ...s, worker: found.shader.worker, desktop: version, frames: arg('frames') ? parseFrames(arg('frames')) : null, click: arg('click') ? parseClick(arg('click')) : null }
     console.log(`shader worker ${found.shader.worker} (started by ${found.shader.backdropFile}), ${s.cli}`)
   }
   const shots = arg('shots')
@@ -272,6 +284,7 @@ async function main(argv) {
       }
       if (s?.frames) fs.writeFileSync(path.join(out, `shader-frames-${m}.json`), JSON.stringify(s.frames, null, 1))
       if (s?.frames && s.frames.length !== input.shader.frames.length) failed = true
+      if (s?.click) console.log(`click ${m}: at ${s.click.x},${s.click.y}, pressed ${s.click.pressedAt} ms, lifted ${s.click.liftedAt} ms, frost cell ${s.click.cell.join(',')}: ${s.click.samples.map((x) => `${x.at} ${x.phase} ${x.rgba.join(',')}`).join('; ')}`)
       console.log(`shader ${m}: ${s?.status}; size ${JSON.stringify(s?.size)}, sharpness ${s?.sharpness} at ratio ${s?.stage?.ratio}; driver ${s?.driver}; Desktop ${s?.desktop}; messages ${s?.messages.map((x) => JSON.stringify(x.msg ?? x.error)).join(' ')}; frost mean ${s?.frost?.mean.join(',') ?? 'none'}; GPU ${s?.gpu}`)
     }
     if (input.frames) {

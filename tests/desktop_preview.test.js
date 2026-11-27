@@ -268,6 +268,13 @@ describe("timeline", () => {
     assert.deepStrictEqual(input.frames.map((x) => [x.t, x.svgTime, x.tree.children[0]]), [[250, 250, "7"], [1000, 1000, "7"]]);
   });
 
+  test("--click takes x,y,tMs and an optional holdMs, and refuses anything else", async () => {
+    const { parseClick } = await load("preview.mjs");
+    assert.deepStrictEqual(parseClick("480,300,2000"), { x: 480, y: 300, t: 2000, hold: 100 });
+    assert.deepStrictEqual(parseClick(" 0, 12.5 ,0,750"), { x: 0, y: 12.5, t: 0, hold: 750 });
+    for (const bad of ["", "1,2", "1,2,3,4,5", "-1,2,3", "1,,3", "a,2,3"]) assert.throws(() => parseClick(bad), /--click takes/, bad);
+  });
+
   test("the ffmpeg list holds each frame for its gap at a rate that divides every gap", async () => {
     const { concatList } = await load("preview.mjs");
     const r = concatList(["C:\\o\\a.png", "/o/b'.png", "/o/c.png"], [0, 250, 750]);
@@ -333,6 +340,25 @@ describe("shader playback", () => {
     for (const k of ["gpu", "desktop", "cli", "worker", "driver"]) assert.ok(s[k], `report names the ${k}`);
     assert.deepStrictEqual(s.size, s.sizes.at(-1));
     assert.strictEqual(s.sharpness, Math.round((s.size[0] / 960) * 100) / 100);
+  });
+
+  // Live, as above. The click fixture paints white within 24 units of a held pointer, rgb(51, 102, 153) elsewhere.
+  test("--click makes the frost cell under the pointer white during the hold and not before", { timeout: 180000 }, async (t) => {
+    const { findBrowser } = await load("capture.mjs");
+    const { findAsar } = await load("preview.mjs");
+    try { findBrowser(); } catch { return t.skip("no Edge, Chrome or Chromium here"); }
+    try { findAsar(); } catch { return t.skip("no Claude Desktop install here"); }
+    if (cp.spawnSync("claude", ["--version"], { stdio: "ignore" }).status !== 0) return t.skip("no claude CLI on the PATH");
+    const out = tmp();
+    const r = cp.spawnSync(process.execPath, [path.join(DIR, "preview.mjs"), "--shader", path.join(__dirname, "fixtures", "desktop-preview-shader-click"), "--click", "240,150,3000,800", "--shots", out, "--modes", "dark", "--size", "960x600"], { encoding: "utf8", timeout: 170000 });
+    assert.strictEqual(r.status, 0, `${r.stdout}\n${r.stderr}`);
+    const c = JSON.parse(fs.readFileSync(path.join(out, "preview-dark.json"), "utf8")).shader.click;
+    const white = (s) => s.rgba.slice(0, 3).every((v) => v >= 254);
+    const of = (phase) => c.samples.filter((s) => s.phase === phase);
+    assert.deepStrictEqual(c.cell, [16, 10]);
+    assert.ok(of("before").length > 0 && !of("before").some(white), JSON.stringify(of("before")));
+    assert.ok(of("hold").some(white), JSON.stringify(of("hold")));
+    assert.ok(!white(of("after").at(-1)), JSON.stringify(of("after")));
   });
 
   // Live, as above. The time fixture paints (fract(time), 0.4, 0.6), so frame n's red is fract(n / 60) at 60 fps.

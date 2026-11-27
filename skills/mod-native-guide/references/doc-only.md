@@ -81,12 +81,12 @@ The measurement stays; the page's claim is written beside it. A page usually des
 
 | Topic | The page says (DOC) | Measured (label, build) |
 |---|---|---|
-| Tree size | 20,000 elements and text children; the first 100,000 characters drawn; 32 levels below the root (reference, Limits) | Desktop refuses the whole tree past 2,000 nodes, depth 32 or 262,144 characters, and the site clears (CODE, 5.11492; `engine-behaviour.md`). The page's numbers match the terminal (`terminal.md`) |
+| Tree size | 20,000 elements and text children; the first 100,000 characters drawn; 32 levels below the root (reference, Limits) | Desktop refuses the whole tree past 2,000 nodes, depth 32 or 262,144 characters, and the site clears (CODE, 5.11492 and 6.28899, which adds a third count refused past 66; `engine-behaviour.md`). The page's numbers match the terminal (`terminal.md`; CODE 2.1.330) |
 | Refused tree | `ui.render (<site>) refused:` in the debug log (troubleshoot) | Desktop refuses with no host log text and no message to the person (CODE, 5.11492; `engine-behaviour.md`) |
-| Toast time | 4 seconds unless `timeoutMs` (reference, Limits) | The Code tab shows it for at least 6 s and cuts text past 240 characters (CODE, 5.11492; `engine-behaviour.md`) |
-| Redraw rate | `$.ui.invalidate` throttled to 10 a second (reference, Limits) | A Desktop band or pane redraws as fast as it invalidates; a transcript row at most once a second (CODE, 5.11492; `engine-behaviour.md`) |
+| Toast time | 4 seconds unless `timeoutMs` (reference, Limits) | The Code tab shows it for at least 6 s and cuts text past 240 characters (CODE, 5.11492 and 6.28899; `engine-behaviour.md`) |
+| Redraw rate | `$.ui.invalidate` throttled to 10 a second (reference, Limits) | A Desktop band or pane redraws as fast as it invalidates; a transcript row at most once a second, a `Theme` ask at most every 500 ms (CODE, 6.28899; `engine-behaviour.md`) |
 | Unknown `borderStyle` | draws with no border (reference, Box border styles) | On Desktop any `borderStyle` draws a 1 px border and padding (CODE, 5.11492; `desktop-elements.md`) |
-| `Link` scheme | an `https:` URL or `http://localhost` (interface) | http or https drew as a link (CODE, 2.1.325; `engine-behaviour.md`). The 2.1.330 types side with the page: trust the page for new mods |
+| `Link` scheme | an `https:` URL or `http://localhost` (interface) | No longer a conflict on Desktop: 6.28899 draws a link only for `https:`, or `http:` on `localhost`, `127.0.0.1` or `[::1]` (CODE; `engine-behaviour.md`). 5.11492 took any http or https |
 | Band rows | one row per mod since 2.1.323 (interface, troubleshoot) | one row per plugin since 2.1.325 (CODE; `traps.md`). Not a conflict: 2.1.325 was the build measured |
 | Keys in a site | Up and Down move between controls; Esc returns focus to the prompt (interface) | Desktop: no arrow navigation, Tab walks; Esc only blurs a field (CODE, 5.11492; `engine-behaviour.md`). The page's table is the terminal's |
 | Toasts on screen | at most three at a time in fullscreen (troubleshoot) | the bundled skill says 50 are held; nobody measured how many draw |

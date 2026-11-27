@@ -1,6 +1,6 @@
-# What each element becomes on Desktop (5.11492.5.0)
+# What each element becomes on Desktop (5.11492.5.0; re-read on 6.28899.6)
 
-CODE unless marked: read in the mod engine chunk a Desktop bundle file (248 KB). The tree is validated against a schema, turned into DOM inside a shadow root, and styled by one engine stylesheet that only uses `--cds-*` tokens. OBS lines come from owner screenshots in the project record.
+CODE unless marked: read in the mod engine chunk a Desktop bundle file (248 KB). A helper re-read it as a Desktop bundle file (209 KB) in 6.28899 on 2026-11-26: about 36 values held as written; the changes are marked "6.28899". The tree is validated against a schema, turned into DOM inside a shadow root, and styled by one engine stylesheet that only uses `--cds-*` tokens. OBS lines come from owner screenshots in the project record.
 
 ## The frame every tree lives in
 
@@ -8,8 +8,9 @@ CODE unless marked: read in the mod engine chunk a Desktop bundle file (248 KB).
 - Site region: `min-h-0 min-w-0 text-body text-primary`. The root Box's vertical margins are zeroed on every site.
 - Schema accepts only: `Box`, `Text` (and `div`, `span`, `b`), `Button`, `Input`, `Select`, `Link`, `Code`, `Markdown`, `Svg`, `Client`. **`Progress` is not in it**, and does not need to be: the CLI lowers a `Progress` to Box and Text before the tree reaches Desktop (CODE, engine). What that draws is a square bar that matches no native meter: `harness-measurements.md`, Progress.
 
-Sizes in this file were read from the CSS at the compact density. Desktop runs comfortable with the second color layer; the measured boxes, inks and gaps of every element are in `harness-measurements.md` and win where the two differ.
-- Limits: more than 2,000 nodes, depth over 32, or over 262,144 characters, and the tree is refused; the host draws without the mod. Transcript tool groups: 1,500 nodes, 196,608 characters.
+Sizes in this file were read from the CSS at the compact density, which 6.28899 removed. Desktop runs comfortable with the second color layer; the measured boxes, inks and gaps of every element are in `harness-measurements.md` and win where the two differ.
+- Limits: more than 2,000 nodes, depth over 32, or over 262,144 characters, and the tree is refused; the host draws without the mod. Transcript tool groups: 1,500 nodes, 196,608 characters. 6.28899 adds a third count, refused past 66 (CODE; what it counts was not traced).
+- 6.28899: the element validators moved to their own chunk (a Desktop bundle file); the accepted set is unchanged and `Progress` is still not in it.
 - `paint` containment clips anything a mod draws past its region, including a focus glow at the top edge (OBS: an Input's glow was cut; start its row `0.4` lower).
 
 ## Box
@@ -51,11 +52,15 @@ A `span`.
 | any truncating `wrap` | `display:inline-block; white-space:pre; text-overflow:ellipsis` |
 | `dimColor` | `var(--engine-dim-ink, text-secondary)`; with `color`, that color at 60% |
 | `size` | the role's size and line height; `title` uses the display face |
-| `weight`, `bold` | regular 400, medium 500, semibold 580; `bold` is read as semibold (580, HARNESS) |
+| `weight`, `bold` | regular 400, medium 500, semibold 580; `bold` is read as semibold (580, HARNESS). 6.28899 also accepts `weight="bold"` (the token is 600; not drawn in the harness) while `bold` still means semibold |
 | `mono`, `tabular` | mono font; tabular figures |
+| `maxLines` (6.28899) | a line clamp (`-webkit-line-clamp`) |
+| `wrap="clip"` (6.28899) | cut with no ellipsis |
+| `inverse` (6.28899) | ink and background swapped: background `color ?? text-primary`, ink `backgroundColor ?? surface-0`; `dimColor` gives opacity .6 |
 
 - A truncating Text needs a parent that can shrink: `<Box flexGrow={1} minWidth={0}>` or `flexShrink={1} minWidth={0}`. Without it the row grows past the pane (OBS).
-- **Auto-mono grid**: non-wrapping Texts stacked in a column that look like a table (box-drawing characters, `---`, or two or more multi-space gaps), or one multi-line grid Text, are switched to the mono font. Aligning columns with spaces therefore changes the font. Use rows of Boxes with fixed widths instead.
+- **Auto-mono grid**: non-wrapping Texts stacked in a column that look like a table (box-drawing characters, `---`, or two or more multi-space gaps), or one multi-line grid Text, are switched to the mono font. Aligning columns with spaces therefore changes the font. In 6.28899 one gap of three or more spaces is enough, and one matching line of a multi-line Text is enough (CODE; INF that this is looser than before, since the 5.11492 rule was not kept). Mono turns ligatures off.
+- `overflowX="scroll"` (6.28899, Box and Text): children keep their width and scroll sideways together. Use rows of Boxes with fixed widths instead.
 - `dir` and `lang` are dropped (CODE, 4.4212); mixed-direction text follows the Unicode algorithm.
 - `~~strike~~` inside a bold line drew with no strike (OBS, 4.16336).
 - Nested Text for mixed ink in one line works (OBS).

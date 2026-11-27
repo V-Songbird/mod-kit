@@ -99,6 +99,8 @@ NOT FOUND: the literal strings `prompt.suggest`, `ui.ask`, `ui.notify`, `ui.sele
 
 ## 4. Density and color-layer wiring
 
+**6.28899 update (CODE, 2026-11-26):** density is gone. The root tag of `index.html` has no `data-density`; the main stylesheet has no `data-density` selector; `densityOverride` survives only in a Desktop bundle file (INF: the retired-keys list). The sizes `.cds-root` sets are the comfortable ones below. The color-layer gate is unchanged: `location.pathname.startsWith("/mobile/")||<embedded>||<user agent>?[]:<parts>` in a Desktop bundle file, and the root still ships `data-cds-fizzy-lake="color panels type"`. The rest of this section is the 5.11492 reading.
+
 CODE, the document: R\ion\index.html root tag is
 
 `<html data-... data-color-version="v2" ... data-cds-fizzy-lake="color panels type" data-document-variant="full" data-entry-document="app" lang="en" data-theme="claude" data-mode="system" data-density="comfortable" class="cds-root h-screen antialiased motion-safe:scroll-smooth">`

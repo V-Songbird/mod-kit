@@ -87,7 +87,7 @@ Measured with scripts/harness/ink.ps1 (kept in the source repository, not shippe
 | Secondary: legend name, token count, path, description, dialog body, group label, the "120.7k / 350k" figure | `#666666` | `#9c9c9c` | 60% black, 57% white: the layer's `text-secondary`, and exactly what a mod's `dimColor` and `subtle` draw (HARNESS) |
 | Muted: the count at the far end of a disclosure row ("139") | `#888888` | `#757575` | 47% black, 40% white: the layer's lighter `text-muted`. A mod has no key for it |
 | Shortcut in a menu, keys in a tooltip | | `#a6a6a6` on `#303030` | 57% white |
-| Destructive menu item | | `#f17778` | the layer's `text-danger` |
+| Destructive menu item | | `#f17778` | the layer's `text-danger`. On 6.28899.6 that ink is `#fa8080`, seen on a destructive Button (Settings, the delete Button of stored sessions, Spanish interface, on `#1f1f1f`, fill `#452525`: `bg-danger` 20% over the ground); a menu item itself was not captured there |
 | Added lines `+338` | `#1e9e3c` | | `text-git-added` |
 
 So native secondary text and a mod's muted text are the same ink on this build. The one native ink a mod cannot reach is the lighter muted of far-end counts; `subtle` there is one step darker than native.

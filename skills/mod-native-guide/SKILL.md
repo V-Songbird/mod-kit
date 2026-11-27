@@ -11,13 +11,13 @@ How Claude draws itself, and what a mod has to write so the host draws it the sa
 
 | Thing | Measured | Where |
 |---|---|---|
-| Claude Desktop (Code tab) | 5.11492.5 | its renderer bundle, read and drawn on a test page |
-| Engine inside Desktop | 2.1.325 | its binary and its bundled `plugin-authoring` types |
-| Native app and mods on screen | Desktop 4.16336 and 5.11492.5 | 51 screenshots, light and dark, measured to the pixel |
+| Claude Desktop (Code tab) | 6.28899.6 (first read on 5.11492.5) | its renderer bundle, read and drawn on a test page; tokens rebuilt and about 60 engine values re-read on 6.28899 (2026-11-26) |
+| Engine inside Desktop | 2.1.330 (first read on 2.1.325) | its binary and its bundled `plugin-authoring` types; themes, validators and limits re-read on 2.1.330 |
+| Native app and mods on screen | Desktop 4.16336 and 5.11492.5; spot checks on 6.28899.6 and engine 2.1.330 | 51 screenshots, light and dark, measured to the pixel; on 6.28899.6, 11 more for the values the re-measure changed |
 | Desktop preview | 6.28899.6, engine 2.1.330 | the installed app's own code on a loopback page (Desktop preview, below) |
 | Docs pages | 2026-11-24 | the nine mods pages, compared with `plugin-authoring` 2.1.330 (`references/doc-only.md`) |
 
-On 2026-11-24 the installed build was Desktop 6.28899.6 with engine 2.1.330. No measurement here was repeated on it. Building one theme added OBS on that build for themes alone: a `Shader` over an `Svg` draws in light and in dark, the Svg's `@media` follows the mode, the glass frosts the chat column, and the shader plays live (`references/themes.md`). Sound, the click effect and reduced motion stay unseen there. Every px, color and behavior below holds for the build its label names. Check `$.session.version()` (or `claude --version`) and treat a value on a newer build as likely, not certain.
+On 2026-11-24 the installed build was Desktop 6.28899.6 with engine 2.1.330. On 2026-11-26 its code and its test-page drawing were re-measured: the design tokens in full, about 60 engine values, and the test page's 28 trees; changes are marked "6.28899" or "2.1.330" in the references. Screenshots then checked the changed values that a screen can show: the brand fill, the danger ink, a hover card in a dock pane and the terminal's pale meter track all match the code (OBS 6.28899.6 and 2.1.330, each marked where it sits). Every other OBS value keeps its older build. Building one theme added OBS on that build for themes alone: a `Shader` over an `Svg` draws in light and in dark, the Svg's `@media` follows the mode, the glass frosts the chat column, and the shader plays live (`references/themes.md`). Sound, the click effect and reduced motion stay unseen there. Every px, color and behavior below holds for the build its label names. Check `$.session.version()` (or `claude --version`) and treat a value on a newer build as likely, not certain.
 
 Every claim carries one label. Trust them in this order.
 
@@ -31,7 +31,7 @@ Every claim carries one label. Trust them in this order.
 
 The references were written in the repository where they were measured. There, *the owner* is the person who maintained them and took the screenshots, and *the project checks* are that repository's scripts. Names marked "not shipped" are files of that repository. Read them as your own project's checks and your own list of approved exceptions.
 
-Desktop draws at the comfortable density with the second color layer (neutral grays, alpha inks); every px and color below is that variant unless it says compact or base.
+Desktop draws at the comfortable density with the second color layer (neutral grays, alpha inks); every px and color below is that variant unless it says compact or base. Desktop 6.28899 removed the density setting and kept only the comfortable sizes, so a compact figure is history and never applies.
 
 ## The contract
 
@@ -90,7 +90,7 @@ Details per site, both surfaces: `references/desktop-sites.md`, `references/term
 17. **Keys on everything in a list**, siblings in a Box (never a fragment), `alt` non-empty on every Svg.
 18. **State in `$.state` atoms**, never module variables; a draft atom behind every Input. A `get` during a render subscribes the site, so a later `set` redraws it.
 19. **Redraw is the mod's job.** Desktop never re-asks a site on a timer. Invalidate on the event that changes the value. A transcript row is re-asked at most once a second; a band or a pane as fast as it invalidates, so throttle there (CODE, `references/engine-behaviour.md`).
-20. **Stay inside the tree limits**: under 2,000 nodes, depth 32 and 262,144 characters, or Desktop refuses the whole answer and the site clears (CODE, 5.11492). The pages give larger numbers, which are the terminal's (`references/doc-only.md`, last section). Cap lists at 4 to 6 rows and a "Show more".
+20. **Stay inside the tree limits**: under 2,000 nodes, depth 32 and 262,144 characters, or Desktop refuses the whole answer and the site clears (CODE, 5.11492 and 6.28899). The pages give larger numbers, which are the terminal's (`references/doc-only.md`, last section). Cap lists at 4 to 6 rows and a "Show more".
 21. **One `hotkey` per Button, unique in the site**: one character `0-9a-z`. It fires only from inside the site, never with Ctrl, Meta or Alt, and never while the person types in a field.
 
 ## Quick tables
@@ -147,8 +147,8 @@ The ones that cost the most time. Full list with evidence: `references/traps.md`
 | One key for a Box's border and its background gives one flat color | A translucent key doubles where the border lies over the background. Give the ring the surface's key (recipe 2) or put the background on a child (recipe 1) (OBS 5.11492) |
 | `hover.scope` shares a hover | A scoped card never shows on the band (CODE, OBS) |
 | A child Text's color shows in a Button | Ignored on a labelled Desktop Button (OBS) |
-| A toast shows for 4 s | The Code tab shows it at least 6 s (CODE, 5.11492) |
-| `$.ui.invalidate` is throttled to 10 a second | A Desktop band or pane redraws as fast as it invalidates (CODE, 5.11492) |
+| A toast shows for 4 s | The Code tab shows it at least 6 s (CODE, 5.11492 and 6.28899) |
+| `$.ui.invalidate` is throttled to 10 a second | A Desktop band or pane redraws as fast as it invalidates (CODE, 5.11492 and 6.28899) |
 | `$.session.compact` compacts | Refused as headless; use `$.command.run({ command: 'compact' })` (OBS) |
 | A Button inside a `Client` is a button | Bare text on Desktop whatever its `variant` (OBS) |
 

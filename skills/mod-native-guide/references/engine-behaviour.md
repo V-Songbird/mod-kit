@@ -1,4 +1,4 @@
-# How Desktop's engine behaves around a mod's tree (Desktop 5.11492.5.0, engine 2.1.325)
+# How Desktop's engine behaves around a mod's tree (Desktop 5.11492.5.0, engine 2.1.325; about 14 values re-read on 6.28899.6, changes marked "6.28899"; ENG line numbers are 5.11492's)
 
 CODE: read by a helper on 2026-11-14 (third pass) in the engine chunk a Desktop bundle file (one statement per line: "ENG n" is that line), the Code-tab chunk a Desktop bundle file ("CT n"), the composer chunk a Desktop bundle file and the loader chunks; spot-checked by the coordinator (last section). INF marks inference. Nothing here was seen in the running app.
 
@@ -44,7 +44,7 @@ Rule for a mod: treat `shown` as "accepted", not "visible". Keep the Button that
 
 - A site is keyed by the JSON of its props (ENG 330). The DOM is rebuilt only when the answer object changes (ENG 1375-1390).
 - Pacing (ENG 331): `AssistantMessage`, `Pane` and `AbovePrompt` **coalesce** (an ask in flight marks the site dirty and one more ask follows the answer); every other component **supersedes** (the new ask aborts the one in flight).
-- Minimum gap between asks, `uiRenderPaceMs` (a Desktop bundle file @35161): **1,000 ms** for AskUserQuestion, AssistantMessage, CommandOutput, InfoNotice, Spinner, ToolGroup, ToolProgress, ToolResult, ToolUse, TurnDuration and UserMessage; **0 ms** for AbovePrompt, Pane, SessionMode, PromptHint and Theme.
+- Minimum gap between asks, `uiRenderPaceMs` (a Desktop bundle file @35161): **1,000 ms** for AskUserQuestion, AssistantMessage, CommandOutput, InfoNotice, Spinner, ToolGroup, ToolProgress, ToolResult, ToolUse, TurnDuration and UserMessage; **0 ms** for AbovePrompt, Pane, SessionMode, PromptHint and Theme. 6.28899 (CODE, re-read; the table moved to a Desktop bundle file): `AgentRow` joins the 1,000 ms set, and `Theme` is now **500 ms**; the coalesce set is unchanged.
 - Width: a ResizeObserver, one per animation frame, recomputes `bodyColumns = floor((clientWidth - padding) / cellWidth)`; no-op changes are dropped; while a pointer is down in the site the update is held and sent 200 ms after release (ENG 1423-1448). So a drag does not redraw the tree under the pointer.
 - Viewport change re-asks every site of the session; the DOM measure is debounced 150 ms (ENG 416-420, 1470).
 - `$.ui.invalidate` with instances re-asks those; without, and on session start, warm and serve events, it re-asks every site (ENG 382-399).
@@ -57,7 +57,7 @@ Rules for a mod: a transcript row cannot animate faster than once a second; a ba
 
 ## 4. Limits on a tree
 
-Whole tree (ENG 30-60): fewer than **2,000 nodes**, depth under **32**, under **262,144** characters; a shared or cyclic object fails. Over any bound the whole answer is refused (null): the site clears. No host log text was found for it. A `Select` counts its options and a `Markdown` its pressable links as nodes.
+Whole tree (ENG 30-60): fewer than **2,000 nodes**, depth under **32**, under **262,144** characters (6.28899 adds a third count refused past 66); a shared or cyclic object fails. Over any bound the whole answer is refused (null): the site clears. No host log text was found for it. A `Select` counts its options and a `Markdown` its pressable links as nodes.
 
 Per node (a failing node degrades to its children only; the rest survives):
 
@@ -66,12 +66,12 @@ Per node (a failing node degrades to its children only; the rest survives):
 | `Select` options | 500 |
 | `Input` rows | clamped to 200 |
 | `Input` length | 16,384 |
-| `Link` href | 2,048 characters, http or https; otherwise drawn as plain text |
+| `Link` href | 2,048 characters, http or https; otherwise drawn as plain text. 6.28899: `https:`, or `http:` only for `localhost`, `127.0.0.1` or `[::1]` (CODE) |
 | `Markdown` pressable links | 500, each 2,048 |
 | `Svg` | source 131,072 characters, width and height 4,096, no children |
 | Client key, module and plugin ids | 256 characters |
 
-Other bounds: 64 panes per roster (more refuses the whole roster, ENG 87); no cap on hover cards beyond the node count; toast and status text of up to 4,096 characters passes the engine's check, empty text drops the message (ENG 91-95); the Code tab then keeps a toast on screen for at least 6 s (`Math.max(timeoutMs, 6000)`) and cuts a toast over 240 characters to 239 plus "…" (CODE, 5.11492, the engine chunk @199532); toast time 4,000 ms default, 60,000 cap (ENG 99-102); a `Client` post over 100,000 characters is not sent, more than 32 timers is refused, a render must answer within 2,000 ms (ENG 941, 1108-1111).
+Other bounds: 64 panes per roster (more refuses the whole roster, ENG 87); no cap on hover cards beyond the node count; toast and status text of up to 4,096 characters passes the engine's check, empty text drops the message (ENG 91-95); the Code tab then keeps a toast on screen for at least 6 s (`Math.max(timeoutMs, 6000)`) and cuts a toast over 240 characters to 239 plus "…" (CODE, 5.11492, the engine chunk @199532); toast time 4,000 ms default, 60,000 cap (ENG 99-102; in 6.28899 Desktop's schema keeps the 4,000 default but has no cap, a positive whole number only; the 2.1.330 CLI still refuses over 60,000 before the toast is sent, `terminal.md`); a `Client` post over 100,000 characters is not sent, more than 32 timers is refused, a render must answer within 2,000 ms (ENG 941, 1108-1111).
 
 ### What the person sees when a mod fails
 

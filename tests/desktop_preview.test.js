@@ -124,6 +124,8 @@ function fakeBundle({ drop, shader } = {}) {
   if (shader) {
     fs.writeFileSync(path.join(v1, "backdrop.js"), 'var D="/assets/shader-worker-Ab_1.js";function U(){}export{U as PointerBackdrop};');
     if (shader === "with worker") fs.writeFileSync(path.join(bundle, "assets", "shader-worker-Ab_1.js"), "");
+    // The anchor where the worker creates its player, as the app's worker does, with a stand-in player.
+    if (shader === "with player") fs.writeFileSync(path.join(bundle, "assets", "shader-worker-Ab_1.js"), "let Z=null,zn={canvas:1};function Mn(){this.frame=7;this.time=0.5;this.gpuMs=0.4;this.quality=0.9;this.calm=95;this.held=0;this.slowMs=0;this.late=1;this.stopped=void 0;this.timer={}}function J(){Z===null&&(Z=new Mn(zn.canvas,{onStop:1}))}");
   }
   return bundle;
 }
@@ -150,9 +152,40 @@ describe("locator", () => {
 
   test("finds the shader worker through the PointerBackdrop chunk, and gives null when it is missing", async () => {
     const { locate } = await load("locate.mjs");
-    assert.deepStrictEqual(locate(fakeBundle({ shader: "with worker" })).shader, { backdropFile: "backdrop.js", worker: "/assets/shader-worker-Ab_1.js" });
+    assert.deepStrictEqual(locate(fakeBundle({ shader: "with worker" })).shader, { backdropFile: "backdrop.js", worker: "/assets/shader-worker-Ab_1.js", metrics: null, metricsMissing: 'anchor "shader-player" not found in /assets/shader-worker-Ab_1.js' });
     assert.strictEqual(locate(fakeBundle({ shader: "chunk only" })).shader, null);
     assert.strictEqual(locate(fakeBundle()).shader, null);
+  });
+
+  test("writes a worker copy that answers preview-metrics with the player's fields, read by the name the worker gives it", async () => {
+    const { locate } = await load("locate.mjs");
+    const bundle = fakeBundle({ shader: "with player" });
+    const s = locate(bundle).shader;
+    assert.deepStrictEqual([s.metrics, s.player], ["/assets/__preview-shader-worker.js", "Z"]);
+    const listeners = [], posted = [];
+    const self = { addEventListener: (k, f) => listeners.push(f), postMessage: (m) => posted.push(m) };
+    require("node:vm").runInNewContext(`${fs.readFileSync(path.join(bundle, s.metrics), "utf8")};J()`, { self });
+    for (const f of listeners) { f({ data: { kind: "stage" } }); f({ data: { kind: "preview-metrics" } }); }
+    assert.deepStrictEqual(structuredClone(posted), [{ preview: "metrics", player: { frame: 7, time: 0.5, gpuMs: 0.4, quality: 0.9, calm: 95, held: 0, slowMs: 0, late: 1, stopped: undefined, timer: true } }]);
+    assert.strictEqual(fs.readFileSync(path.join(bundle, "assets", "shader-worker-Ab_1.js"), "utf8").includes("preview-metrics"), false, "the app's own worker file stays as extracted");
+  });
+});
+
+describe("measure", () => {
+  test("--measure takes whole ms from 1000 to 20000", async () => {
+    const { parseMeasure } = await load("preview.mjs");
+    assert.strictEqual(parseMeasure("5000"), 5000);
+    for (const bad of ["", "999", "20001", "5e3", "-1", "1.5", undefined]) assert.throws(() => parseMeasure(bad), /--measure takes/, String(bad));
+  });
+
+  test("the control keeps validate's shader lines as printed and each pass's weak and fast frame ms", async () => {
+    const { validateCost } = await load("preview.mjs");
+    const file = path.join(tmp(), "validate.js");
+    fs.writeFileSync(file, `console.log("Validating hooks: x\\n  \\u276F ./register.tsx hooks: ui.render\\n  \\u276F shader hooks/a.ts: runs on any GPU; sharpness 2.00 weak, 2.00 fast, at 60 fps\\n  \\u276F shader hooks/a.ts: pass 1 picture a: frame ms 1.30 weak, 0.40 fast; first frame ms 1.30 weak, 0.40 fast\\n  \\u276F shader hooks/a.ts: pass 2 buffer b: frame ms 4.37 weak, 2.83 fast; first frame ms 5 weak, 3 fast")`);
+    const c = validateCost("plugin", [process.execPath, file]);
+    assert.strictEqual(c.lines.length, 3);
+    assert.match(c.source, /static estimate/);
+    assert.deepStrictEqual(c.passes, [{ pass: 1, weakMs: 1.3, fastMs: 0.4 }, { pass: 2, weakMs: 4.37, fastMs: 2.83 }]);
   });
 });
 
@@ -381,6 +414,47 @@ describe("shader playback", () => {
       const want = [((f.n / 60) % 1) * 255, 102, 153, 255];
       want.forEach((w, i) => assert.ok(Math.abs(f.pixel[i] - w) <= 1, `frame ${f.n} channel ${i}: ${f.pixel[i]}, want ${w}`));
     }
+  });
+
+  // Live, as above: --measure on the real clock. Still: the flat fixture. Always moving: the time fixture. Flicker: black
+  // and white ten times a second. Heavy: nested loops; a slow stop only where this GPU reaches one.
+  const measure = (t, name, ms) => {
+    const out = tmp();
+    const r = cp.spawnSync(process.execPath, [path.join(DIR, "preview.mjs"), "--shader", path.join(__dirname, "fixtures", name), "--measure", String(ms), "--shots", out, "--modes", "dark", "--size", "960x600"], { encoding: "utf8", timeout: 170000 });
+    assert.strictEqual(r.status, 0, `${r.stdout}\n${r.stderr}`);
+    const rt = JSON.parse(fs.readFileSync(path.join(out, "preview-dark.json"), "utf8")).shader.runtime;
+    assert.strictEqual(rt.clock, "real");
+    assert.ok(rt.control.passes.length > 0 && /static estimate/.test(rt.control.source), JSON.stringify(rt.control));
+    assert.match(r.stdout, /control dark \(validate, a static estimate, not the same figure\)/);
+    for (const k of ["renderer", "desktop", "cli", "stage"]) assert.ok(rt[k], `runtime names the ${k}`);
+    assert.deepStrictEqual([rt.restarts.count, rt.restarts.reimplemented], [0, false]);
+    return rt;
+  };
+  const live = async (t) => {
+    const { findBrowser } = await load("capture.mjs");
+    const { findAsar } = await load("preview.mjs");
+    try { findBrowser(); } catch { t.skip("no Edge, Chrome or Chromium here"); return false; }
+    try { findAsar(); } catch { t.skip("no Claude Desktop install here"); return false; }
+    if (cp.spawnSync("claude", ["--version"], { stdio: "ignore" }).status !== 0) { t.skip("no claude CLI on the PATH"); return false; }
+    return true;
+  };
+
+  test("--measure: a still Shader rests once it passes 90 calm frames, and a moving one never rests", { timeout: 360000 }, async (t) => {
+    if (!(await live(t))) return;
+    const still = measure(t, "desktop-preview-shader", 4000);
+    assert.ok(still.rests >= 1 && still.firstRestFrame >= 91, JSON.stringify(still.last));
+    assert.deepStrictEqual(still.stops, []);
+    const moving = measure(t, "desktop-preview-shader-time", 4000);
+    assert.ok(moving.frames > 91, `moving fixture drew ${moving.frames} frames`);
+    assert.strictEqual(moving.rests, 0, JSON.stringify(moving.last));
+  });
+
+  test("--measure: a black-white flicker stops with flash, and a heavy Shader reports any stop it reaches", { timeout: 360000 }, async (t) => {
+    if (!(await live(t))) return;
+    assert.deepStrictEqual(measure(t, "desktop-preview-shader-flash", 8000).stops, ["flash"]);
+    const heavy = measure(t, "desktop-preview-shader-heavy", 8000);
+    assert.ok(heavy.stops.every((s) => ["slow", "lost", "unfit"].includes(s)), JSON.stringify(heavy.stops));
+    t.diagnostic(`heavy: stops ${heavy.stops.join(",") || "none"}, ms per frame ${JSON.stringify(heavy.msPerFrame)}, sharpness ${JSON.stringify(heavy.sharpness)}`);
   });
 });
 

@@ -8,7 +8,7 @@
 //                         [--timeline <timeline.json> | --times <ms,ms,...>] [--reduced-motion] [--video]
 //                         [--shots <dir>] [--modes light,dark] [--size 1628x1348]
 //                         [--asar <ion-dist.asar>] [--cache <dir>] [--port <n>]
-//                         [--shader <plugin dir> [--frames <n,n,...> | --click <x,y,tMs[,holdMs]>]]
+//                         [--shader <plugin dir> [--frames <n,n,...> | --click <x,y,tMs[,holdMs]> | --measure <ms>]]
 // With --shots it captures each mode and exits; without it, it serves until stopped.
 // With --timeline or --times it captures one PNG per frame, with every animation paused at the frame's time.
 // With --shader it asks the CLI for the Shader the plugin's Backdrop hook draws and plays it in the app's own worker.
@@ -16,6 +16,8 @@
 // one, as shader-<mode>-<n>.png, with shader-frames-<mode>.json holding each frame's time, size, center and hash.
 // With --click it presses a pointer at x,y (CSS px of the stage) at tMs on the page clock, holds it holdMs (100 when
 // left out), then releases and lifts it, as PointerBackdrop does; the report keeps the frost cell under it over time.
+// With --measure <ms> it plays a patched copy of the worker on the real clock for that long after the first drawn frame
+// and keeps the player's own fields in the report's shader.runtime, beside validate's static cost as the control.
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
@@ -205,6 +207,25 @@ export async function fetchShader({ pluginDir, theme = null, command = ['claude'
   }
 }
 
+/** --measure: ms of real clock to watch the player after its first drawn frame, 1000 to 20000, as the page waits 30 s. */
+export function parseMeasure(text) {
+  const ms = /^\d+$/.test(text?.trim() ?? '') ? Number(text) : NaN
+  if (!(ms >= 1000 && ms <= 20000)) throw new Error(`--measure takes whole ms from 1000 to 20000, such as 5000; not ${text}`)
+  return ms
+}
+
+/**
+ * The control for --measure: the static cost `claude plugin validate` prints for each shader file, kept as printed,
+ * with each pass's frame ms on the weak and fast GPU classes. An estimate, never the same figure as a measured frame.
+ */
+export function validateCost(pluginDir, command = ['claude']) {
+  const [cmd, ...pre] = command
+  const r = spawnSync(cmd, [...pre, 'plugin', 'validate', pluginDir], { encoding: 'utf8' })
+  const lines = `${r.stdout}`.split(/\r?\n/).map((l) => l.replace(/^\s*❯\s*/, '').trim()).filter((l) => /^shader \S+:/.test(l))
+  const passes = lines.flatMap((l) => { const m = /pass (\d+) .*?: frame ms ([\d.]+) weak, ([\d.]+) fast/.exec(l); return m ? [{ pass: Number(m[1]), weakMs: Number(m[2]), fastMs: Number(m[3]) }] : [] })
+  return { source: 'claude plugin validate, a static estimate', exit: r.status, lines, passes }
+}
+
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.otf': 'font/otf', '.png': 'image/png', '.webp': 'image/webp', '.ico': 'image/x-icon' }
 
 /** Serves the page, the extracted bundle and the inputs on 127.0.0.1 only, and answers only requests addressed to it. */
@@ -254,11 +275,15 @@ async function main(argv) {
   if (arg('frames') && !arg('shader')) throw new Error('--frames needs --shader')
   if (arg('click') && !arg('shader')) throw new Error('--click needs --shader')
   if (arg('click') && arg('frames')) throw new Error('--click takes no --frames: the page clock runs free')
+  if (arg('measure') && !arg('shader')) throw new Error('--measure needs --shader')
+  if (arg('measure') && (arg('frames') || arg('click'))) throw new Error('--measure takes no --frames or --click: it watches the player on the real clock, unpressed')
   if (arg('shader')) {
     if (input.frames) throw new Error('--shader takes no --timeline or --times')
     if (!found.shader) throw new Error('anchor "shader-worker" not found: no PointerBackdrop chunk names an existing /assets/shader-worker-*.js in this Desktop build')
+    const measure = arg('measure') ? parseMeasure(arg('measure')) : null
+    if (measure && !found.shader.metrics) throw new Error(found.shader.metricsMissing)
     const s = await fetchShader({ pluginDir: path.resolve(arg('shader')), theme: input.theme })
-    input.shader = { ...s, worker: found.shader.worker, desktop: version, frames: arg('frames') ? parseFrames(arg('frames')) : null, click: arg('click') ? parseClick(arg('click')) : null }
+    input.shader = { ...s, worker: measure ? found.shader.metrics : found.shader.worker, desktop: version, frames: arg('frames') ? parseFrames(arg('frames')) : null, click: arg('click') ? parseClick(arg('click')) : null, measure, control: measure ? validateCost(path.resolve(arg('shader'))) : null }
     console.log(`shader worker ${found.shader.worker} (started by ${found.shader.backdropFile}), ${s.cli}`)
   }
   const shots = arg('shots')
@@ -285,6 +310,8 @@ async function main(argv) {
       if (s?.frames) fs.writeFileSync(path.join(out, `shader-frames-${m}.json`), JSON.stringify(s.frames, null, 1))
       if (s?.frames && s.frames.length !== input.shader.frames.length) failed = true
       if (s?.click) console.log(`click ${m}: at ${s.click.x},${s.click.y}, pressed ${s.click.pressedAt} ms, lifted ${s.click.liftedAt} ms, frost cell ${s.click.cell.join(',')}: ${s.click.samples.map((x) => `${x.at} ${x.phase} ${x.rgba.join(',')}`).join('; ')}`)
+      const rt = s?.runtime
+      if (rt) console.log(`runtime ${m} (real clock, ${rt.windowMs} ms): ms per frame ${rt.msPerFrame ? `${rt.msPerFrame.mean} mean, ${rt.msPerFrame.max} max` : `none (${rt.msPerFrameMissing})`}; fps ${rt.fps} on the player's clock, ${rt.fpsWall} on the real one; sharpness ${rt.sharpness.last} (${rt.sharpness.min} to ${rt.sharpness.max}); rests ${rt.rests}; restarts ${rt.restarts.count}; stops ${rt.stops.join(',') || 'none'}; at ${rt.stage.width}x${rt.stage.height} ratio ${rt.stage.ratio}, GPU ${rt.renderer}, Desktop ${rt.desktop}, ${rt.cli}\ncontrol ${m} (validate, a static estimate, not the same figure): ${rt.control.passes.map((p) => `pass ${p.pass} ${p.weakMs} ms weak, ${p.fastMs} ms fast`).join('; ') || rt.control.lines.join('; ') || 'no shader line printed'}`)
       console.log(`shader ${m}: ${s?.status}; size ${JSON.stringify(s?.size)}, sharpness ${s?.sharpness} at ratio ${s?.stage?.ratio}; driver ${s?.driver}; Desktop ${s?.desktop}; messages ${s?.messages.map((x) => JSON.stringify(x.msg ?? x.error)).join(' ')}; frost mean ${s?.frost?.mean.join(',') ?? 'none'}; GPU ${s?.gpu}`)
     }
     if (input.frames) {

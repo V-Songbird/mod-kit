@@ -301,11 +301,27 @@ describe("timeline", () => {
     assert.deepStrictEqual(input.frames.map((x) => [x.t, x.svgTime, x.tree.children[0]]), [[250, 250, "7"], [1000, 1000, "7"]]);
   });
 
-  test("--click takes x,y,tMs and an optional holdMs, and refuses anything else", async () => {
+  test("--click takes x,y,tMs, an optional holdMs and an optional release point, and refuses anything else", async () => {
     const { parseClick } = await load("preview.mjs");
-    assert.deepStrictEqual(parseClick("480,300,2000"), { x: 480, y: 300, t: 2000, hold: 100 });
-    assert.deepStrictEqual(parseClick(" 0, 12.5 ,0,750"), { x: 0, y: 12.5, t: 0, hold: 750 });
-    for (const bad of ["", "1,2", "1,2,3,4,5", "-1,2,3", "1,,3", "a,2,3"]) assert.throws(() => parseClick(bad), /--click takes/, bad);
+    assert.deepStrictEqual(parseClick("480,300,2000"), { x: 480, y: 300, t: 2000, hold: 100, upX: 480, upY: 300 });
+    assert.deepStrictEqual(parseClick(" 0, 12.5 ,0,750"), { x: 0, y: 12.5, t: 0, hold: 750, upX: 0, upY: 12.5 });
+    assert.deepStrictEqual(parseClick("480,300,2000,100,490,300"), { x: 480, y: 300, t: 2000, hold: 100, upX: 490, upY: 300 });
+    for (const bad of ["", "1,2", "1,2,3,4,5", "1,2,3,4,5,6,7", "-1,2,3", "1,,3", "a,2,3"]) assert.throws(() => parseClick(bad), /--click takes/, bad);
+  });
+
+  // The app's rule (Desktop 6.28899.6, chunk c4dc8d9c8-*): release within 400 ms and 8 px, x and y in 1/64 of the stage.
+  test("--click reports the ui.pointer click the app would send, and none for a 500 ms hold or a 10 px drag", async () => {
+    const { parseClick, clickPayload } = await load("preview.mjs");
+    const stage = { width: 960, height: 600 };
+    const click = clickPayload(parseClick("241,151,3000,100"), stage);
+    assert.deepStrictEqual(click, { data: { type: "click", x: 16 / 64, y: 16 / 64 }, why: null });
+    assert.ok([click.data.x, click.data.y].every((v) => Number.isInteger(v * 64)));
+    assert.deepStrictEqual(clickPayload(parseClick("240,150,3000,500"), stage), { data: null, why: "held 500 ms, over 400" });
+    assert.deepStrictEqual(clickPayload(parseClick("240,150,3000,100,250,150"), stage), { data: null, why: "moved 10 px, over 8" });
+    // The limits themselves still click, and the drag's x is the release point's.
+    assert.deepStrictEqual(clickPayload(parseClick("240,150,3000,400,248,150"), stage).data, { type: "click", x: 17 / 64, y: 16 / 64 });
+    assert.deepStrictEqual(clickPayload(parseClick("960,600,0,100"), stage).data, { type: "click", x: 1, y: 1 });
+    assert.deepStrictEqual(clickPayload(parseClick("960,600,0,100,961,600"), stage), { data: null, why: "released outside the stage" });
   });
 
   test("the ffmpeg list holds each frame for its gap at a rate that divides every gap", async () => {

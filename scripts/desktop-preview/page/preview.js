@@ -204,11 +204,12 @@ try {
       w.postMessage({ kind: 'pause', isPaused: false })
       if (click) {
         if (click.x > b.width || click.y > b.height) { report.shader.messages.push({ at: at(), error: `--click ${click.x},${click.y} is outside the ${b.width}x${b.height} stage` }); ok('click outside the stage'); return }
-        // As PointerBackdrop's onPoint and onLift: a press, a release at the same point, then the lift.
-        const point = (isPressed) => w.postMessage({ kind: 'point', id: 1, x: click.x, y: click.y, isPressed, isOverApp: false })
+        // As PointerBackdrop's onPoint and onLift: a press, a move to the release point while pressed, a release there,
+        // then the lift. The release point is the press point unless --click names another.
+        const point = (x, y, isPressed) => w.postMessage({ kind: 'point', id: 1, x, y, isPressed, isOverApp: false })
         setTimeout(() => {
-          point(true); click.pressedAt = at()
-          setTimeout(() => { point(false); w.postMessage({ kind: 'lift', id: 1 }); click.liftedAt = at() }, click.hold)
+          point(click.x, click.y, true); click.pressedAt = at()
+          setTimeout(() => { point(click.upX, click.upY, true); point(click.upX, click.upY, false); w.postMessage({ kind: 'lift', id: 1 }); click.liftedAt = at() }, click.hold)
         }, Math.max(0, click.t - at()))
       }
     })

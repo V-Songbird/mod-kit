@@ -8,14 +8,15 @@
 //                         [--timeline <timeline.json> | --times <ms,ms,...>] [--reduced-motion] [--video]
 //                         [--shots <dir>] [--modes light,dark] [--size 1628x1348]
 //                         [--asar <ion-dist.asar>] [--cache <dir>] [--port <n>]
-//                         [--shader <plugin dir> [--frames <n,n,...> | --click <x,y,tMs[,holdMs]> | --measure <ms>]]
+//                         [--shader <plugin dir> [--frames <n,n,...> | --click <x,y,tMs[,holdMs[,upX,upY]]> | --measure <ms>]]
 // With --shots it captures each mode and exits; without it, it serves until stopped.
 // With --timeline or --times it captures one PNG per frame, with every animation paused at the frame's time.
 // With --shader it asks the CLI for the Shader the plugin's Backdrop hook draws and plays it in the app's own worker.
 // With --frames it steps that worker on a fixed clock and saves the canvas at each frame number after the first drawn
 // one, as shader-<mode>-<n>.png, with shader-frames-<mode>.json holding each frame's time, size, center and hash.
 // With --click it presses a pointer at x,y (CSS px of the stage) at tMs on the page clock, holds it holdMs (100 when
-// left out), then releases and lifts it, as PointerBackdrop does; the report keeps the frost cell under it over time.
+// left out), then releases it at upX,upY (x,y when left out) and lifts it, as PointerBackdrop does; the report keeps the
+// frost cell under it over time, and shader.click.pointer holds the ui.pointer data the app would send, or none and why.
 // With --measure <ms> it plays a patched copy of the worker on the real clock for that long after the first drawn frame
 // and keeps the player's own fields in the report's shader.runtime, beside validate's static cost as the control.
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
@@ -113,12 +114,28 @@ export function parseFrames(text) {
   return list
 }
 
-/** --click: x,y in CSS px of the stage, tMs on the page clock, and an optional holdMs, each a number 0 or more. */
+/**
+ * --click: x,y in CSS px of the stage, tMs on the page clock, an optional holdMs, and an optional release point
+ * upX,upY (x,y when left out), each a number 0 or more.
+ */
 export function parseClick(text) {
   const parts = text.split(',').map((s) => s.trim())
-  if (parts.length < 3 || parts.length > 4 || parts.some((s) => !/^\d+(\.\d+)?$/.test(s))) throw new Error(`--click takes x,y,tMs or x,y,tMs,holdMs, numbers 0 or more, such as 480,300,2000,500; not ${text}`)
-  const [x, y, t, hold = 100] = parts.map(Number)
-  return { x, y, t, hold }
+  if (![3, 4, 6].includes(parts.length) || parts.some((s) => !/^\d+(\.\d+)?$/.test(s))) throw new Error(`--click takes x,y,tMs, x,y,tMs,holdMs or x,y,tMs,holdMs,upX,upY, numbers 0 or more, such as 480,300,2000,100; not ${text}`)
+  const [x, y, t, hold = 100, upX = x, upY = y] = parts.map(Number)
+  return { x, y, t, hold, upX, upY }
+}
+
+/**
+ * The ui.pointer data the app would send for this press, as Desktop 6.28899.6 decides it (chunk c4dc8d9c8-*): a click
+ * only when the release comes within 400 ms and 8 px of the press and inside the stage, with x and y the release
+ * point as fractions of the stage rounded to 1/64. `data` is null when the app sends none, and `why` says which rule.
+ * Not modelled: the 500 ms gap between two clicks, a press over the app's own controls or its top band, an open dialog
+ * or menu. `hold` is the asked hold, not the measured one, which ran about 8 ms longer on 2026-11-26.
+ */
+export function clickPayload({ x, y, hold, upX = x, upY = y }, stage) {
+  const fx = upX / stage.width, fy = upY / stage.height
+  const why = hold > 400 ? `held ${hold} ms, over 400` : Math.hypot(upX - x, upY - y) > 8 ? `moved ${Math.round(Math.hypot(upX - x, upY - y) * 100) / 100} px, over 8` : Math.min(fx, fy) < 0 || Math.max(fx, fy) > 1 ? 'released outside the stage' : null
+  return why ? { data: null, why } : { data: { type: 'click', x: Math.round(fx * 64) / 64, y: Math.round(fy * 64) / 64 }, why: null }
 }
 
 /**
@@ -309,6 +326,12 @@ async function main(argv) {
       }
       if (s?.frames) fs.writeFileSync(path.join(out, `shader-frames-${m}.json`), JSON.stringify(s.frames, null, 1))
       if (s?.frames && s.frames.length !== input.shader.frames.length) failed = true
+      if (s?.click) {
+        const file = path.join(out, `preview-${m}.json`), report = JSON.parse(fs.readFileSync(file, 'utf8'))
+        s.click.pointer = report.shader.click.pointer = clickPayload(s.click, s.stage)
+        fs.writeFileSync(file, JSON.stringify(report, null, 1))
+        console.log(`ui.pointer ${m}: ${s.click.pointer.data ? JSON.stringify(s.click.pointer.data) : `none (${s.click.pointer.why})`}`)
+      }
       if (s?.click) console.log(`click ${m}: at ${s.click.x},${s.click.y}, pressed ${s.click.pressedAt} ms, lifted ${s.click.liftedAt} ms, frost cell ${s.click.cell.join(',')}: ${s.click.samples.map((x) => `${x.at} ${x.phase} ${x.rgba.join(',')}`).join('; ')}`)
       const rt = s?.runtime
       if (rt) console.log(`runtime ${m} (real clock, ${rt.windowMs} ms): ms per frame ${rt.msPerFrame ? `${rt.msPerFrame.mean} mean, ${rt.msPerFrame.max} max` : `none (${rt.msPerFrameMissing})`}; fps ${rt.fps} on the player's clock, ${rt.fpsWall} on the real one; sharpness ${rt.sharpness.last} (${rt.sharpness.min} to ${rt.sharpness.max}); rests ${rt.rests}; restarts ${rt.restarts.count}; stops ${rt.stops.join(',') || 'none'}; at ${rt.stage.width}x${rt.stage.height} ratio ${rt.stage.ratio}, GPU ${rt.renderer}, Desktop ${rt.desktop}, ${rt.cli}\ncontrol ${m} (validate, a static estimate, not the same figure): ${rt.control.passes.map((p) => `pass ${p.pass} ${p.weakMs} ms weak, ${p.fastMs} ms fast`).join('; ') || rt.control.lines.join('; ') || 'no shader line printed'}`)

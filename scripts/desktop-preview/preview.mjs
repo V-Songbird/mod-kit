@@ -250,7 +250,7 @@ async function main(argv) {
     for (const r of results) { console.log(`${r.file}\t${r.status}\t${r.sha256}`); failed ||= r.status !== 'ok' }
     if (input.shader) for (const m of modes) {
       const s = JSON.parse(fs.readFileSync(path.join(out, `preview-${m}.json`), 'utf8')).shader
-      console.log(`shader ${m}: ${s?.status}; messages ${s?.messages.map((x) => JSON.stringify(x.msg ?? x.error)).join(' ')}; frost mean ${s?.frost?.mean.join(',') ?? 'none'}; GPU ${s?.gpu}`)
+      console.log(`shader ${m}: ${s?.status}; size ${JSON.stringify(s?.size)}, sharpness ${s?.sharpness} at ratio ${s?.stage?.ratio}; driver ${s?.driver}; Desktop ${s?.desktop}; messages ${s?.messages.map((x) => JSON.stringify(x.msg ?? x.error)).join(' ')}; frost mean ${s?.frost?.mean.join(',') ?? 'none'}; GPU ${s?.gpu}`)
     }
     if (input.frames) {
       fs.writeFileSync(path.join(out, 'frames.json'), JSON.stringify({ reducedMotion, frames: results }, null, 1))

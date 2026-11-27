@@ -330,7 +330,9 @@ describe("shader playback", () => {
     assert.ok(said.includes("fit") && said.includes("drawn"), JSON.stringify(said));
     assert.deepStrictEqual([s.frost.width, s.frost.height], [64, 40]);
     [51, 102, 153, 255].forEach((want, i) => assert.ok(Math.abs(s.frost.mean[i] - want) <= 1, `channel ${i}: ${s.frost.mean[i]}, want ${want}`));
-    for (const k of ["gpu", "desktop", "cli", "worker"]) assert.ok(s[k], `report names the ${k}`);
+    for (const k of ["gpu", "desktop", "cli", "worker", "driver"]) assert.ok(s[k], `report names the ${k}`);
+    assert.deepStrictEqual(s.size, s.sizes.at(-1));
+    assert.strictEqual(s.sharpness, Math.round((s.size[0] / 960) * 100) / 100);
   });
 });
 

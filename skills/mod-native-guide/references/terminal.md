@@ -1,6 +1,8 @@
-# The terminal side (engine 2.1.325)
+# The terminal side (engine 2.1.325, partly re-read on 2.1.330)
 
-CODE: read by a helper in the carved engine modules (an engine module renderer, an engine module validators and tables, an engine module themes, an engine module sites) and spot-checked by the coordinator (spacing table, Progress lowering, Button drawing, 8 constants). OBS lines are owner screenshots of Windows Terminal. Theme values: data/terminal-themes-2.1.325.tsv (kept in the source repository, not shipped).
+CODE: read by a helper in the carved engine modules of 2.1.325 (an engine module renderer, an engine module validators and tables, an engine module themes, an engine module sites) and spot-checked by the coordinator (spacing table, Progress lowering, Button drawing, 8 constants). OBS lines are owner screenshots of Windows Terminal. Theme values: data/terminal-themes-2.1.330.tsv (kept in the source repository, not shipped).
+
+2.1.330 re-read (2026-11-26): the validators, element tables and Progress lowering are in an engine module, the themes in an engine module. Confirmed there: the 12-element table, the depth, node and character limits, Progress lowering, the toast bounds and default, the band controls. The Ink drawing of each element (Button brackets, Input hint, Select window, Markdown rows, border styles) was not located: the carve was narrow and searched literal glyphs, which the code writes escaped. Those rows stay 2.1.325 readings.
 
 ## Elements
 
@@ -41,14 +43,14 @@ Six themes: dark, light, dark-ansi, light-ansi, dark-daltonized, light-daltonize
 | `error` | 255,107,128 | 171,43,63 | redBright | |
 | `claude` | 215,119,87 | 215,119,87 | redBright | brand |
 | `promptBorder` | 136,136,136 | 138,138,138 | white | |
-| `rate_limit_fill` | 177,185,249 | 87,105,247 | **yellow** | untyped; lavender in dark (OBS), yellow in the ANSI themes |
-| `rate_limit_empty` | 80,83,112 | 39,47,111 | white | untyped |
+| `rate_limit_fill` | 177,185,249 | 87,105,247 | **yellow** | untyped; lavender in dark (OBS 2.1.325); light-ansi turned from yellow to blue in 2.1.330 |
+| `rate_limit_empty` | 80,83,112 | 213,218,253 | blackBright | untyped; in 2.1.330 the light themes got a pale track (was 39,47,111, a dark one) and the ANSI themes swapped white and black. Seen in Windows Terminal (OBS 2.1.330): 80,83,112 under fill 177,185,249 in dark, 213,218,253 under 87,105,247 in light; the terminal kept its own dark ground under the light theme |
 | `userMessageBackground` | 55,55,55 | 240,240,240 | blackBright | untyped; the Progress track |
 | `composerSidebarBackground` | 38,38,38 | 245,245,245 | blackBright | untyped |
 
 Lessons (OBS and CODE):
 
-- The same key is a different hue per surface: `rate_limit_fill` is blue on Desktop, lavender in the dark terminal, yellow in the ANSI themes. For blue **ink** in the terminal use the typed `suggestion`.
+- The same key is a different hue per surface: `rate_limit_fill` is blue on Desktop, lavender in the dark terminal, yellow in dark-ansi and blue in light-ansi (2.1.330). For blue **ink** in the terminal use the typed `suggestion`.
 - A fixed hex (`#fab219`, `#d03b3b`) is the same on every theme, which is why the meter's warning and danger fills are hex and the blue is a key.
 - Daltonized themes swap green and red for blue and orange: never carry meaning by `success` versus `error` color alone. Pair a mark (`✓`, `✗`, `⚠`) with the color.
 - ANSI themes have 16 colors: several keys collapse to the same one. Shape, not hue, must carry state.
@@ -63,8 +65,8 @@ Lessons (OBS and CODE):
 | Band | width `columns − 5`; a `[-]` collapse control at the top right; collapsed: dim `▸ plugin panel hidden · <chord> or click to show`; a taller tree scrolls with a dim `↑ N more · ↓ N more`; at most half the terminal's rows |
 | Footer (`SessionMode`) | dim text after the engine's segments, joined by a dim ` · ` |
 | `PromptHint` | dim, one row, truncated |
-| Toast | `plugin: text`, 4,000 ms; a stacked box in fullscreen, else one notification line. `timeoutMs` is a whole number, 1 to 60,000, else the call is refused (CODE, the 60000 maximum and the 4000 default). A toast still waiting gives way, unseen, to the same plugin's newer one (CODE, engine text "gives way to the plugin's newer ones, unseen") |
-| `$.ui.log` | `to` is `transcript` (default) or `debug`; a one-line form is clipped at 120 characters, a multi-line one at 1,000 (CODE, the 120 and 1000 limits; which call uses which was not traced) |
+| Toast | `plugin: text`, 4,000 ms; a stacked box in fullscreen, else one notification line. `timeoutMs` is a whole number, 1 to 60,000, else the call is refused (CODE, the 60000 maximum and the 4000 default). A toast still waiting gives way, unseen, to the same plugin's newer one (CODE, engine text "gives way to the plugin's newer ones, unseen"). New in 2.1.330 types: the first 2,000 characters are drawn (10,000 remotely); `holdToasts` keeps toasts waiting undrawn, and past 50 waiting the oldest leaves (CODE, the 50) |
+| `$.ui.log` | `to` is `transcript` (default) or `debug`; the terminal draws the first 2,000 characters, a remote surface 10,000, the debug log keeps 10,000 (types 2.1.330; the clipping code was not found). The 120 and 1,000 limits earlier read here belong to `$.ui.notify`: title clipped at 120 on one line, text at 1,000 (CODE 2.1.330) |
 | Status | a pinned low-priority notification line `plugin: text` |
 
 `bodyColumns` is exact in the terminal: tier layouts by it there (the project uses 78 and 42 for the band, 48 and 32 for a pane).

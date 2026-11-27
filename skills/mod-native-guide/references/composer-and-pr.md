@@ -52,7 +52,7 @@ For a mod's own list: a 28 px row, 8 px gap, label then muted value at the far e
 | checks_running, checks_passing | neutral | Checks running, Checks passing |
 | waiting_for_review, open | accent | Waiting for review, Open |
 
-Badge (a Desktop bundle file @49117): 22 px high, 12 px text, weight 500. On the color layer Desktop ships it is a **transparent pill with a 1 px line and colored text**, not a tinted fill (`stacks:` overrides: `bg-transparent`, text per variant; neutral's line is the badge-line token). Text inks, light / dark: accent `#1757ac` / `#6aabf1`, success `#006c10` / `#53c556`, warning `#895902` / `#e49c06`, danger `#a42528` / `#f17778`, neutral 60% ink.
+Badge (a Desktop bundle file @49117): 22 px high, 12 px text, weight 500. On the color layer Desktop ships it is a **transparent pill with a 1 px line and colored text**, not a tinted fill (`stacks:` overrides: `bg-transparent`, text per variant; neutral's line is the badge-line token). Text inks, light / dark: accent `#1757ac` / `#6aabf1`, success `#006c10` / `#53c556`, warning `#895902` / `#e49c06`, danger `#a42528` / `#f17778` (`#fa8080` in 6.28899), neutral 60% ink.
 
 ### Session-panel chip (a Desktop bundle file @70763, state map in a Desktop bundle file @208500)
 

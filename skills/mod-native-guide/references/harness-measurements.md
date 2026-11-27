@@ -1,4 +1,6 @@
-# Harness measurements (Desktop 5.11492.5.0)
+# Harness measurements (Desktop 5.11492.5.0; re-run on 6.28899.6)
+
+Re-run on 2026-11-26 with 6.28899's builder and stylesheets, four variants (light and dark, base and layer; density no longer exists). About 75 values on this page came out the same. Three differ, marked "6.28899" where they stand: the `error` ink in dark, the `claude` fill, and the pane hover card's lowest sample points.
 
 What Desktop's own DOM builder and stylesheet draw for a mod tree, measured in a browser with `getComputedStyle` and `getBoundingClientRect`, and checked against two owner screenshots of the real app.
 
@@ -6,9 +8,9 @@ Label **HARNESS**: the engine chunk's builder, the app's three stylesheets, and 
 
 ## Desktop 6.28899.6: two corrections
 
-Found with the Desktop preview (`scripts/desktop-preview/`) on Desktop 6.28899.6.0, engine 2.1.330. The 5.11492 values below stay as measured.
+Found with Mod Kit's Desktop preview script on Desktop 6.28899.6.0, engine 2.1.330 (Foundry, mod-kit commit a5726c1, 2026-11-26). The 5.11492 values below stay as measured.
 
-- **The interface font inside the desktop app is the system font, not `anthropic-sans`** (CODE, HARNESS). With no stored choice the app resolves its font to `system` when the user agent is the desktop app's, and sets `data-font="system"` on `<html>`. That maps the sans face to the system face, Segoe UI on Windows. `anthropic-sans` is the web default. The 7.55 px `ch` on this page is the system face at 14 px; `anthropic-sans` gives 8.4 px, and an Input 273 px wide instead of 183 px. The 5.11492 harness got the right widths only because it measured before its web font loaded.
+- **The interface font inside the desktop app is the system font, not `anthropic-sans`** (CODE, HARNESS). With no stored choice the app resolves its font to `system` when the user agent is the desktop app's, and sets `data-font="system"` on `<html>`. That maps the sans face to the system face, Segoe UI on Windows. `anthropic-sans` is the web default. The 7.55 px `ch` on this page is the system face at 14 px; `anthropic-sans` gives 8.4 px, and an Input 273 px wide instead of 183 px. The 5.11492 harness got the right widths only because it measured before its web font loaded. This skill's own harness does not set `data-font`, so its font line reads `anthropic-sans` (the 2026-11-26 re-run too).
 - **The compact density is gone** (CODE, HARNESS). The 6.28899.6 stylesheets have no `data-density` selector, so compact draws the same as comfortable. Read the compact columns below as 5.11492 history.
 
 ## Which variant is the real app
@@ -20,7 +22,7 @@ Found with the Desktop preview (`scripts/desktop-preview/`) on Desktop 6.28899.6
 - OBS, a reviewer's independent scan of `2026-11-03-4.16336-panel-band-footer-dark.png`: mod Buttons 28 px tall with fill `#3b3b3b` on `#191919`, the band card `#252525` and 40 px, the band meter 6 px of `#257de0`.
 - CODE: `index.html` ships `<html class="cds-root" data-density="comfortable" data-cds-fizzy-lake="color panels type">`; the root component falls back to `comfortable`; `densityOverride` occurs twice in the bundle, once in that fallback and once in a list of retired storage keys; nothing sets `data-density`. The color layer is off only on `/mobile/` paths, an embedded context, or a non-Electron `Claude/` user agent.
 
-So read the **comfortable + layer** column first. Compact and base values are kept because the CSS still carries them and a later build may switch.
+So read the **comfortable + layer** column first. Base values are kept because the CSS still carries them. The compact column is history: 6.28899 removed the density setting and its compact sizes, keeping only the comfortable ones (CODE, `desktop-tokens.md`).
 
 The two shots are builds 4.16336 and a later one before 5.11492. The running 5.11492 app was measured later from seventeen owner captures, ten dark and seven light: `native-screens.md`, last sections; lines below marked OBS 5.11492 come from there. The light captures confirm this page's light column where they overlap: Button fill 5% black (`#f2f2f2`), Input 28 px and 183 px wide with a 1 px ring of 8% black (`#ebebeb`), secondary ink 60% black (`#666666`), `rate_limit_fill` `#257de0`, the 8 px gap of `columnGap={1}`.
 
@@ -104,7 +106,7 @@ Drawn in the harness: a 6 px **square** bar, full width; fill `rgb(23,87,172)` i
 - A Text in that card with `color="inverseText"` is white on white in light: invisible. Use no color or `text`.
 - A card whose hover names a `scope` stays `display: none` in the band.
 - On screen (OBS 5.11492, dark) the lifted card is 360 px with its ring, `#1f1f1f`, ring `#282828`: as above. A one-word card is 71 × 44 px with its ring: one 20 px line plus 12 px above and below and about 16 px at the sides, which is the 12 × 16 read here.
-- In a dock pane (case `hover-card-pane-solid`): the card stays in place (`popover` absent, `z-index: auto`). With `borderStyle="round"`, `borderColor="promptBorder"`, `backgroundColor="composerSidebarBackground"`, `paddingX={1}` and four keyed rows it is 106 px high (12 px vertical padding from the border) and it is the top element at all 13 points sampled down its middle, over a plain row, a `position: relative` row and a Button row, in both modes. Without the background the app shows the rows through it (OBS 5.11492). With it the app draws the card opaque in the pane's `#191919` (OBS 5.11492), not the `#1f1f1f` read here.
+- In a dock pane (case `hover-card-pane-solid`): the card stays in place (`popover` absent, `z-index: auto`). With `borderStyle="round"`, `borderColor="promptBorder"`, `backgroundColor="composerSidebarBackground"`, `paddingX={1}` and four keyed rows it is 106 px high (12 px vertical padding from the border; same in 6.28899) and it is the top element at all 13 points sampled down its middle (6.28899: at the top 10 only; the lowest three read outside the card, and the last of them lies just below the site host's bottom edge; what is on top there was not traced. The full-page run reads 0 of 13 only because the case sits below the viewport; on screen on 6.28899.6 the same card is 106 px from ring to ring in both modes, opaque, and drawn whole down to its bottom ring over all three kinds of rows, so the three low points are a harness effect: OBS 6.28899.6, light and dark), over a plain row, a `position: relative` row and a Button row, in both modes. Without the background the app shows the rows through it (OBS 5.11492). With it the app draws the card opaque in the pane's `#191919` (OBS 5.11492), not the `#1f1f1f` read here.
 
 ## Band
 
@@ -122,9 +124,9 @@ Drawn in the harness: a 6 px **square** bar, full width; fill `rgb(23,87,172)` i
 | `suggestion`, `permission` | `rgb(23,87,172)`; `rgb(106,171,241)` |
 | `success`, `planMode` | `rgb(0,108,16)`; `rgb(83,197,86)` |
 | `warning` | `rgb(137,89,2)`; `rgb(228,156,6)` |
-| `error` | `rgb(164,37,40)`; `rgb(241,119,120)` |
+| `error` | `rgb(164,37,40)`; `rgb(250,128,128)` in 6.28899 (was `rgb(241,119,120)`) |
 | `autoAccept` | `rgb(84,55,184)`; `rgb(168,154,240)` |
-| `claude` | `rgb(198,97,63)` in both |
+| `claude` | `rgb(186,91,60)` in both in 6.28899 (was `rgb(198,97,63)`) |
 | `promptBorder` | 20% ink |
 | `rate_limit_fill` | `rgb(37,125,224)` in both |
 | `rate_limit_empty` | 12% of that blue |

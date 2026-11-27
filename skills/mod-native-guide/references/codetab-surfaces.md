@@ -5,14 +5,14 @@ What Claude draws natively around a pane or band: code fences, inline code, diff
 How to read it:
 
 - A helper read this in the renderer bundle (the `ion-dist.asar` assets; chunk names shortened to nine hex characters, `chunk@character offset`). Every line here is CODE: read in the bundle, not seen on screen (the helper's own tag for it was replaced by the skill's label). The coordinator re-checked a sample (the usage thresholds, the fence class, the git ink tokens, the skeleton sweep).
-- Sizes are quoted for the **compact** density first. Desktop runs **comfortable** with the second color layer (`harness-measurements.md`), so take the comfortable figure where two are given, and the "fizzy" color where two are given. `--cds-pad-md` is 12 px, not 8, and `--cds-h-control` is 28 px with a mouse.
+- Sizes are quoted for the **compact** density first. Desktop runs **comfortable** with the second color layer (`harness-measurements.md`), so take the comfortable figure where two are given, and the "fizzy" color where two are given. Since 6.28899 the compact figures exist nowhere (`desktop-tokens.md`). `--cds-pad-md` is 12 px, not 8, and `--cds-h-control` is 28 px with a mouse.
 - Hex values are for comparing against a screenshot. A mod writes theme keys.
 
 **Two color sets exist.** The root attribute `data-cds-fizzy-lake` (parts `color`, `panels`, `type`) switches the token set. Base tokens: surface-1 `#fcfcfb`, text-primary `#0b0b0b`, accent `#2a78d6`. Layer ("fizzy") tokens: surface-1 `#fff` (dark `#191919`), text-primary `#000000e6` (dark `#ffffffed`), text-muted `#0007` (dark `#fff6`), accent `#257de0`, border `#00000014` (dark `#ffffff0a`). The layer is the one Desktop ships.
 
 ## 6. Resolved values (done first, other sections rely on it)
 
-**Compact vs comfortable leading (CODE CSS rules via `vars.tsv`).** The default `.cds-root` block is compact; `.cds-root[data-density=comfortable]` overrides it.
+**Compact vs comfortable leading (CODE CSS rules via `vars.tsv`, 5.11492).** In 5.11492 the default `.cds-root` block was compact and `.cds-root[data-density=comfortable]` overrode it. In 6.28899 `.cds-root` holds the comfortable column below and the compact one is gone.
 
 | Token | Compact (`.cds-root`) | Comfortable | Other selector |
 |---|---|---|---|
@@ -24,7 +24,7 @@ How to read it:
 | `--cds-font-size-code` / `--cds-leading-code` | 12 px / 1.0625rem = 17 px | 13 / 1.1875rem = 19 | `.epitaxy-diff.epitaxy-file-rows` leading = `round(font-size-code*1.5 + .01px, 1px)` = 18 px at 12 px |
 | `--cds-h-control` | 1.5rem = 24 px | 2rem = 32 px (1.75rem = 28 px under `(hover:hover) and (pointer:fine)`) | `[data-step="1".."5"]` = 20/24/28/32(28 hover)/40 px; `[data-size=xs|sm|lg]` use `--cds-h-control--*` |
 
-So footnote leading = 15 (16 when the font is the system font), body leading = 19 compact / 20 comfortable. The 16 and 20 candidates are the system-font and comfortable variants. Per-message body size: `[data-text-size=sm|md|lg]` on AssistantMessage/UserMessage/ChatComposerQueuedMessages sets body 13/14/15 px and leading 19/20/22 px (CODE CSS@1757612-1758709). Transcript typography: `.epitaxy-transcript-typography` `--chat-body: .9375rem` (15 px), `--chat-leading:1.4`; `[data-chat-text-size=s]` .875rem/1.4286, `=l` 1rem/1.375 (CODE CSS@1819000 region). Composer: `--prompt-text-size` .9375rem, `--prompt-line-height` max(1.3125rem, floor) = 21 px; s = .875rem/1.25rem, l = 1rem/(1.375rem).
+So footnote leading = 15 compact (16 when the font is the system font), 17 comfortable, the only value from 6.28899; body leading = 19 compact / 20 comfortable. The 16 and 20 candidates are the system-font and comfortable variants. Per-message body size: `[data-text-size=sm|md|lg]` on AssistantMessage/UserMessage/ChatComposerQueuedMessages sets body 13/14/15 px and leading 19/20/22 px (CODE CSS@1757612-1758709). Transcript typography: `.epitaxy-transcript-typography` `--chat-body: .9375rem` (15 px), `--chat-leading:1.4`; `[data-chat-text-size=s]` .875rem/1.4286, `=l` 1rem/1.375 (CODE CSS@1819000 region). Composer: `--prompt-text-size` .9375rem, `--prompt-line-height` max(1.3125rem, floor) = 21 px; s = .875rem/1.25rem, l = 1rem/(1.375rem).
 
 **Legacy utilities (CODE `rc.mjs` over main CSS).**
 

@@ -6,7 +6,7 @@ How to read it:
 
 - A helper read this in the renderer bundle. Every line here is CODE: read in the bundle, not seen on screen (the helper's own tag for it was replaced by the skill's label). The coordinator re-checked a sample (icon font face and size ladder, the chip radius rule, the default tab variant, `--spacing`, the tooltip width).
 - Chunk abbreviations: `SF` = a Desktop bundle file, `S36` = a Desktop bundle file, `S18` = a Desktop bundle file, `CSS` = a Desktop bundle file.
-- Density pairs are `compact | comfortable`. Desktop runs **comfortable** with the second color layer ("fizzy", the `stacks:` classes), so take the second figure and the `stacks:` recipe. Resolved px: pad xs/sm/md/lg/xl 4/6/8/12/20 | 6/8/12/16/24, h-control-nested 18|22, radius 6|8, icon 16|20, caption 11|12, footnote 12|13, body 13|14.
+- Density pairs are `compact | comfortable`; 6.28899 removed compact, so only the second figure exists now. Desktop runs **comfortable** with the second color layer ("fizzy", the `stacks:` classes), so take the second figure and the `stacks:` recipe. Resolved px: pad xs/sm/md/lg/xl 4/6/8/12/20 | 6/8/12/16/24, h-control-nested 18|22, radius 6|8, icon 16|20, caption 11|12, footnote 12|13, body 13|14.
 - **Correction:** `--cds-h-control` is quoted below as `24 | 32`. With a mouse the comfortable value is **28 px**; 32 is touch (`harness-measurements.md`). Menu rows, tabs and header cells follow it.
 
 ## 1. Badge (no Chip/Tag/Pill/Label component exists)

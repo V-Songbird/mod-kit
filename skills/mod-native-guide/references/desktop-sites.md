@@ -1,16 +1,17 @@
-# Render sites on Desktop (5.11492.5.0, engine 2.1.325)
+# Render sites on Desktop (5.11492.5.0, engine 2.1.325; re-read on 6.28899.6)
 
-CODE unless marked: engine chunk a Desktop bundle file, Code-tab sites a Desktop bundle file, and the 2.1.325 types and `reference.md`. OBS lines are from owner screenshots.
+CODE unless marked: engine chunk a Desktop bundle file, Code-tab sites a Desktop bundle file, and the 2.1.325 types and `reference.md`. OBS lines are from owner screenshots. A helper re-read the CODE values in 6.28899 on 2026-11-26 (engine chunk a Desktop bundle file, Code-tab a Desktop bundle file); about twelve held as written, and the changes are marked "6.28899".
 
 ## AbovePrompt (the band)
 
 What the host does to a tree there:
 
-- **One row per plugin** (2.1.325): the hook is asked once per plugin (`e.plugin`), and `AbovePromptList` stacks the rows with `gap sm`. Another mod's answer or invalid tree cannot blank yours. A hook with nothing to show returns `next(e)`. The older rule "compose the band with `await next(e)`" is stale for this build, but harmless.
+- **One row per plugin** (2.1.325): the hook is asked once per plugin (`e.plugin`), and the rows are stacked in a column with `gap sm` (6.28899: no `AbovePromptList` string is left; the band component's shaper splits the column on its `part` children and restacks it the same way; the per-plugin ask was not re-read). Another mod's answer or invalid tree cannot blank yours. A hook with nothing to show returns `next(e)`. The older rule "compose the band with `await next(e)`" is stale for this build, but harmless.
 - Props: `hasSurvey`, `isWorking`, `maxRows: 12`, `bodyColumns`, `scroll`, `view` (and `isCollapsed` in the types). Return `next(e)` untouched when `hasSurvey`.
-- Row: a card with 8 px padding, 10 px radius and the alpha-1 fill; min height 40 px, max `11lh + 40px` (CODE; 40 px and the fill measured on owner shots, light `#f3f3f3`, dark `#252525`).
+- Row: a card with 8 px padding, 10 px radius and the alpha-1 fill; min height 40 px, max `11lh + 40px` (CODE; 40 px and the fill measured on owner shots, light `#f3f3f3`, dark `#252525`). In 6.28899 the card class lives in a shared chunk the engine imports; the values are the same. The band body and its close control sit 5 px apart.
 - Ink: `--engine-dim-ink` is `var(--muted-as-secondary, text-muted)` there (CODE: the band's own `:host` rule; where no site sets the variable, `dimColor` falls back to text-secondary). The color layer Desktop ships sets `--muted-as-secondary` to the secondary ink, so `dimColor` text measures the same as elsewhere (60% black, 57% white: HARNESS, and OBS 5.11492 in dark); it is the lighter muted ink only on the base colors; `--engine-button-dim-ink` is text-secondary.
-- Controls use the `--sm` token set and are centered on the text line: every Button is 28 px tall with 10 px side padding, 7 px radius and 14 px text (HARNESS; compact: 20, 6, 5, 12).
+- Controls use the `--sm` token set and are centered on the text line: every Button is 28 px tall with 10 px side padding, 7 px radius and 14 px text (HARNESS 5.11492; the CSS values are unchanged in 6.28899, and compact no longer exists).
+- 6.28899: the shaper can move `dimColor` Buttons and the host action into a "more" menu Button. It does so only when `keepsButtonsInView` is set, and the Code tab sets it only for `cc-plugin-you-should-know@builtin` (CODE). A third-party band is not affected.
 - A **plain Button is forced to that same control shape** on the band (28 px tall, 10 px padding, `min-height: 0`). It no longer hugs its text.
 - Input, Select and submit: `1lh` tall, `pad-sm`; a textarea grows to 12 lines.
 - Hover cards are lifted to native popovers (see `desktop-elements.md`).
@@ -35,8 +36,8 @@ Then: copy goes left, actions go right with `gap-sm`, a `role="dismiss"` Button 
 
 | Seat | Frame | Hover cards |
 |---|---|---|
-| `dock` | a tile beside the chat, `h-full w-full p-lg` (16 px; 12 compact); a tab row "Plugin panes" when several are open | drawn in place |
-| `rail` | a section of the session panel, `w-full px-xs py-1`, at most `min(rows ?? 12, 24)` lines | lifted |
+| `dock` | a tile beside the chat, `h-full w-full p-lg` (16 px); a tab row "Plugin panes" when several are open | drawn in place |
+| `rail` | a section of the session panel, `w-full px-xs py-1`, at most `min(rows ?? 12, 24)` lines (6.28899 adds a `max-h` of that many lines plus padding) | lifted |
 | `widget` (`placement: 'widget'`) | a minimized small form; clicks may not reach it | not checked |
 
 - Dock pane on screen (OBS 5.11492, dark): it shares the page color `#191919` with the session panel (317 px wide), behind a 1 px line `#303030`. The host's head is 44 px to its hairline `#353535`, with the title in primary ink and an expand icon and a close X at the right. Content starts 16 px in and rows end 24 px before the right edge, where a 6 px scrollbar thumb lives. A hover card there is see-through unless it has a `backgroundColor`.
@@ -69,7 +70,7 @@ The hook returns the engine's tree plus one Button:
 
 ## Toast (`$.ui.toast`)
 
-A native info toast: `<plugin>: <text>`, cut at 240 characters (CODE, re-read in 5.11492: 239 plus "…"), on screen for at least 6 s: the Code tab shows it for `Math.max(timeoutMs, 6000)` (CODE, 5.11492: the floor is a 6e3 constant in the shared chunk, imported by the engine chunk), so the engine's 4 s default and any shorter `timeoutMs` become 6 s, the same as a native toast; 60 s at most (a 6e4 constant in the engine chunk). One live toast per session and plugin (`uniqueKey: engine-notice:<session>:<plugin>`) (a new one replaces it), delivered only while the session is visible. Native toasts sit bottom-right in a 360 px column. Write a full sentence with a period, without the plugin name. A toast is never the only record of a result.
+A native info toast: `<plugin>: <text>`, cut at 240 characters (CODE, re-read in 5.11492: 239 plus "…"), on screen for at least 6 s: the Code tab shows it for `Math.max(timeoutMs, 6000)` (CODE, 5.11492: the floor is a 6e3 constant in the shared chunk, imported by the engine chunk; in 6.28899 the same floor is written inline in the engine chunk), so the engine's 4 s default and any shorter `timeoutMs` become 6 s, the same as a native toast; 60 s at most (a 6e4 constant in the engine chunk). One live toast per session and plugin (`uniqueKey: engine-notice:<session>:<plugin>`) (a new one replaces it), delivered only while the session is visible. Native toasts sit bottom-right in a 360 px column. Write a full sentence with a period, without the plugin name. A toast is never the only record of a result.
 
 `$.ui.log`: a line shown for 10 s. `$.ui.notify` resolves `no-surface` in a Desktop-hosted session (CODE, 4.4212).
 

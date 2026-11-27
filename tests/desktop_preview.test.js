@@ -241,7 +241,9 @@ describe("frame capture", () => {
     const url = `http://127.0.0.1:${server.address().port}/`;
     try {
       const out = tmp();
-      const r = await capture([{ url, name: "a", svgTime: 250 }, { url, name: "b", svgTime: 250 }], out, 320, 200, { reducedMotion: true });
+      // GitHub's Ubuntu runners allow no sandbox for Chrome; only the test, never the preview, turns it off there.
+      const browserArgs = process.platform === "linux" && process.env.CI ? ["--no-sandbox"] : [];
+      const r = await capture([{ url, name: "a", svgTime: 250 }, { url, name: "b", svgTime: 250 }], out, 320, 200, { reducedMotion: true, browserArgs });
       assert.deepStrictEqual(r.map((x) => x.status), ["ok", "ok"]);
       assert.deepStrictEqual(r[0].seek.flatMap((d) => d.smil), [{ id: "sq", attribute: "x", value: 25 }]);
       assert.ok(r[0].seek.every((d) => d.reduced === true));

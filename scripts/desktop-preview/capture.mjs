@@ -43,18 +43,18 @@ const SETTLE = 'new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame((
  * prefers-reduced-motion is set explicitly, `reduce` with `reducedMotion`. A shot with `svgTime` has every animation of
  * the page and of each frame it holds paused at that time; the shot fails when a clock reads back another time.
  */
-export async function capture(shots, outDir, width, height, { reducedMotion = false } = {}) {
+export async function capture(shots, outDir, width, height, { reducedMotion = false, browserArgs = [] } = {}) {
   for (const { url } of shots) if (!/^http:\/\/127\.0\.0\.1:\d+\//.test(url)) throw new Error(`loopback only: ${url}`)
   fs.mkdirSync(outDir, { recursive: true })
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'mod-kit-preview-browser-'))
-  const proc = spawn(findBrowser(), ['--headless=new', `--user-data-dir=${profile}`, '--remote-debugging-port=0', '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--disable-sync', '--force-device-scale-factor=1', `--window-size=${width},${height}`, '--hide-scrollbars', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] })
+  const proc = spawn(findBrowser(), ['--headless=new', `--user-data-dir=${profile}`, '--remote-debugging-port=0', '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--disable-sync', '--force-device-scale-factor=1', `--window-size=${width},${height}`, '--hide-scrollbars', ...browserArgs, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] })
   const results = []
   let ws
   try {
     const wsUrl = await new Promise((ok, no) => {
       let buf = ''
       proc.stderr.on('data', (d) => { buf += d; const m = /ws:\/\/\S+/.exec(buf); if (m) ok(m[0]) })
-      proc.on('exit', (code) => no(new Error(`browser exited with ${code} before DevTools started`)))
+      proc.on('exit', (code, signal) => no(new Error(`browser exited with ${code ?? signal} before DevTools started: ${buf.trim().slice(-400)}`)))
       setTimeout(() => no(new Error('no DevTools URL within 20 s')), 20000)
     })
     ws = new WebSocket(wsUrl)

@@ -71,11 +71,15 @@ try {
 
   // The Shader, in the app's own worker, driven with the messages the PointerBackdrop chunk sends: start, stage,
   // pause, then underlay (the Svg over the surface color) once the worker names its size. The driver is this page,
-  // not the app's own path: it sends no composer box, no veils, no pointer and no GPU class, and it treats the Svg
-  // as still. isFrosted is on, so the worker posts the 64x40 readback the app's glass paints from.
+  // not the app's own path: it sends no composer box, no veils, no pointer but the one --click asks for and no GPU
+  // class, and it treats the Svg as still. isFrosted is on, so the worker posts the 64x40 readback the app's glass
+  // paints from.
   if (input.shader) {
     const sh = input.shader
-    report.shader = { worker: sh.worker, desktop: sh.desktop, cli: sh.cli, driver: 'preview page after PointerBackdrop, not the app', messages: [], sizes: [], size: null, sharpness: null, frost: null }
+    report.shader = { worker: sh.worker, desktop: sh.desktop, cli: sh.cli, driver: `preview page after PointerBackdrop, not the app${sh.click ? '; one pointer, from --click' : ''}`, messages: [], sizes: [], size: null, sharpness: null, frost: null }
+    // --click: the frost cell under the pointer at each readback after drawn, named by what had been sent by then.
+    const click = sh.click && (report.shader.click = { ...sh.click, cell: null, pressedAt: null, liftedAt: null, samples: [] })
+    let afterClick = 0
     const gl = document.createElement('canvas').getContext('webgl2'), dbg = gl?.getExtension('WEBGL_debug_renderer_info')
     report.shader.gpu = gl ? gl.getParameter(dbg ? dbg.UNMASKED_RENDERER_WEBGL : gl.RENDERER) : 'no WebGL2'
     const layer = S('backdropLayer')(document)
@@ -117,7 +121,7 @@ try {
       return 'drawn'
     }
     report.shader.status = await new Promise((ok) => {
-      setTimeout(() => ok('timeout'), sh.frames ? 25000 : 15000)
+      setTimeout(() => ok('timeout'), sh.frames ? 25000 : Math.max(15000, click ? click.t + click.hold + 10000 : 0))
       w.addEventListener('error', (e) => { report.shader.messages.push({ at: at(), error: e.message || 'worker error' }); ok('lost') })
       w.addEventListener('message', ({ data: d }) => {
         if (d?.preview) { reply?.(d); return }
@@ -131,7 +135,15 @@ try {
             const sum = [0, 0, 0, 0]
             for (let i = 0; i < d.data.length; i++) sum[i % 4] += d.data[i]
             report.shader.frost = { width: d.width, height: d.height, mean: sum.map((v) => Math.round((v / (d.data.length / 4)) * 100) / 100) }
-            ok('drawn')
+            if (!click) ok('drawn')
+          }
+          if (click && drawn && afterClick < 3) {
+            const [cx, cy] = click.cell = [Math.min(d.width - 1, Math.floor((click.x / report.shader.stage.width) * d.width)), Math.min(d.height - 1, Math.floor((click.y / report.shader.stage.height) * d.height))]
+            const i = (cy * d.width + cx) * 4
+            const phase = click.pressedAt === null ? 'before' : click.liftedAt === null ? 'hold' : 'after'
+            click.samples.push({ at: at(), phase, rgba: [...d.data.slice(i, i + 4)] })
+            // Three readbacks after the lift show the shader let go; the mean above is kept as without --click.
+            if (phase === 'after' && ++afterClick >= 3 && report.shader.frost) ok('drawn')
           }
           return
         }
@@ -153,6 +165,15 @@ try {
       w.postMessage({ kind: 'start', canvas: off, shader: { ir: sh.ir, values: sh.values }, gpu: undefined, carried: undefined, isFrosted: true }, [off])
       w.postMessage({ kind: 'stage', stage: { ...report.shader.stage, isPictured: img.complete, composer: undefined, veils: [] } })
       w.postMessage({ kind: 'pause', isPaused: false })
+      if (click) {
+        if (click.x > b.width || click.y > b.height) { report.shader.messages.push({ at: at(), error: `--click ${click.x},${click.y} is outside the ${b.width}x${b.height} stage` }); ok('click outside the stage'); return }
+        // As PointerBackdrop's onPoint and onLift: a press, a release at the same point, then the lift.
+        const point = (isPressed) => w.postMessage({ kind: 'point', id: 1, x: click.x, y: click.y, isPressed, isOverApp: false })
+        setTimeout(() => {
+          point(true); click.pressedAt = at()
+          setTimeout(() => { point(false); w.postMessage({ kind: 'lift', id: 1 }); click.liftedAt = at() }, click.hold)
+        }, Math.max(0, click.t - at()))
+      }
     })
     report.steps.push('shader')
     if (report.shader.status !== 'drawn') throw new Error(`shader: ${report.shader.status}`)

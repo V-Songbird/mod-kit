@@ -8,11 +8,14 @@
 //                         [--timeline <timeline.json> | --times <ms,ms,...>] [--reduced-motion] [--video]
 //                         [--shots <dir>] [--modes light,dark] [--size 1628x1348]
 //                         [--asar <ion-dist.asar>] [--cache <dir>] [--port <n>]
-//                         [--shader <plugin dir>]
+//                         [--shader <plugin dir> [--frames <n,n,...>]]
 // With --shots it captures each mode and exits; without it, it serves until stopped.
 // With --timeline or --times it captures one PNG per frame, with every animation paused at the frame's time.
 // With --shader it asks the CLI for the Shader the plugin's Backdrop hook draws and plays it in the app's own worker.
+// With --frames it steps that worker on a fixed clock and saves the canvas at each frame number after the first drawn
+// one, as shader-<mode>-<n>.png, with shader-frames-<mode>.json holding each frame's time, size, center and hash.
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import http from 'node:http'
 import os from 'node:os'
@@ -97,6 +100,13 @@ export function resolveTimeline({ tree = null, theme = null, frames }) {
     if ('theme' in f) theme = f.theme
     return { t: f.t, svgTime: f.t - since, tree, theme }
   })
+}
+
+/** --frames: frame numbers after the Shader's first drawn frame, whole, 0 or more, each once. */
+export function parseFrames(text) {
+  const parts = text.split(',').map((s) => s.trim()), list = parts.map(Number)
+  if (parts.some((s) => !/^\d+$/.test(s)) || new Set(list).size !== list.length) throw new Error(`--frames takes distinct whole frame numbers, 0 or more, such as 0,30,60; not ${text}`)
+  return list
 }
 
 /**
@@ -195,9 +205,10 @@ export function startServer({ bundle, input, saveDir, port = 0 }) {
     const url = new URL(req.url, `http://127.0.0.1:${p}`)
     if (req.method === 'POST' && url.pathname === '/__save') {
       const name = (url.searchParams.get('name') ?? 'report').replace(/[^a-z0-9-]/gi, '')
+      const ext = url.searchParams.get('ext') === 'png' ? 'png' : 'json'
       const parts = []; let size = 0
       req.on('data', (d) => { size += d.length; if (size > 8e6) req.destroy(); else parts.push(d) })
-      req.on('end', () => { fs.mkdirSync(saveDir, { recursive: true }); fs.writeFileSync(path.join(saveDir, `${name}.json`), Buffer.concat(parts)); res.writeHead(204).end() })
+      req.on('end', () => { fs.mkdirSync(saveDir, { recursive: true }); fs.writeFileSync(path.join(saveDir, `${name}.${ext}`), Buffer.concat(parts)); res.writeHead(204).end() })
       return
     }
     if (req.method !== 'GET') return res.writeHead(405).end()
@@ -206,9 +217,13 @@ export function startServer({ bundle, input, saveDir, port = 0 }) {
       const f = frames?.[Number(url.searchParams.get('frame'))]
       return res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(f ? { ...rest, ...f } : rest))
     }
+    // The frame-mode worker: shader-clock.js first, then the app's worker, in one module worker.
+    if (url.pathname === '/__preview-shader-clock.js' && input.shader) {
+      return res.writeHead(200, { 'content-type': TYPES['.js'], 'cache-control': 'no-store' }).end(`import '/shader-clock.js'\nimport ${JSON.stringify(input.shader.worker)}\n`)
+    }
     let rel
     try { rel = decodeURIComponent(url.pathname === '/' ? '/preview.html' : url.pathname) } catch { return res.writeHead(400).end() }
-    const root = rel === '/preview.html' || rel === '/preview.js' ? PAGE : bundle
+    const root = ['/preview.html', '/preview.js', '/shader-clock.js'].includes(rel) ? PAGE : bundle
     const file = path.resolve(root, `.${rel}`)
     if (!file.startsWith(root + path.sep)) return res.writeHead(403).end()
     fs.readFile(file, (err, buf) => {
@@ -226,11 +241,12 @@ async function main(argv) {
   console.log(`Claude Desktop ${version}: engine ${found.engineFile}, sites ${found.sitesFile}, theme ${found.themeFile}`)
   console.log(`cache ${cache}`)
   const input = readInput({ tree: arg('tree'), site: arg('site'), theme: arg('theme'), settings: arg('settings'), timeline: arg('timeline'), times: arg('times') })
+  if (arg('frames') && !arg('shader')) throw new Error('--frames needs --shader')
   if (arg('shader')) {
     if (input.frames) throw new Error('--shader takes no --timeline or --times')
     if (!found.shader) throw new Error('anchor "shader-worker" not found: no PointerBackdrop chunk names an existing /assets/shader-worker-*.js in this Desktop build')
     const s = await fetchShader({ pluginDir: path.resolve(arg('shader')), theme: input.theme })
-    input.shader = { ...s, worker: found.shader.worker, desktop: version }
+    input.shader = { ...s, worker: found.shader.worker, desktop: version, frames: arg('frames') ? parseFrames(arg('frames')) : null }
     console.log(`shader worker ${found.shader.worker} (started by ${found.shader.backdropFile}), ${s.cli}`)
   }
   const shots = arg('shots')
@@ -250,6 +266,12 @@ async function main(argv) {
     for (const r of results) { console.log(`${r.file}\t${r.status}\t${r.sha256}`); failed ||= r.status !== 'ok' }
     if (input.shader) for (const m of modes) {
       const s = JSON.parse(fs.readFileSync(path.join(out, `preview-${m}.json`), 'utf8')).shader
+      for (const f of s?.frames ?? []) {
+        f.sha256 = createHash('sha256').update(fs.readFileSync(path.join(out, f.file))).digest('hex')
+        console.log(`${path.join(out, f.file)}\tframe ${f.n} at ${f.t} ms${f.naps ? ` (nominal: ${f.naps} naps)` : ''}\tsize ${f.size.join('x')}\tcenter ${f.pixel.join(',')}\t${f.sha256}`)
+      }
+      if (s?.frames) fs.writeFileSync(path.join(out, `shader-frames-${m}.json`), JSON.stringify(s.frames, null, 1))
+      if (s?.frames && s.frames.length !== input.shader.frames.length) failed = true
       console.log(`shader ${m}: ${s?.status}; size ${JSON.stringify(s?.size)}, sharpness ${s?.sharpness} at ratio ${s?.stage?.ratio}; driver ${s?.driver}; Desktop ${s?.desktop}; messages ${s?.messages.map((x) => JSON.stringify(x.msg ?? x.error)).join(' ')}; frost mean ${s?.frost?.mean.join(',') ?? 'none'}; GPU ${s?.gpu}`)
     }
     if (input.frames) {

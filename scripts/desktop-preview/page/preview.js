@@ -90,13 +90,41 @@ try {
     img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(sh.svg)}`
     await img.decode().catch(() => {})
     const t0 = performance.now(), at = () => Math.round(performance.now() - t0)
-    const w = new Worker(sh.worker, { type: 'module', name: 'backdrop' })
+    // With frames, shader-clock.js runs before the worker and the page steps each frame itself, from fit on.
+    const w = new Worker(sh.frames ? '/__preview-shader-clock.js' : sh.worker, { type: 'module', name: 'backdrop' })
     const STOPS = ['refused', 'unfit', 'flash', 'slow', 'lost']
-    let drawn = false, readbacks = 0
+    let drawn = false, readbacks = 0, reply = null, tick = 0, drawnTick = null
+    const ask = (msg) => new Promise((ok, no) => { reply = (d) => (d.preview === 'error' ? no(new Error(d.error)) : ok(d)); w.postMessage(msg) })
+    // Frame n is the nth frame request after the first frame drawn. While the shader moves, the worker draws at each
+    // request with 1/fps, so frame n sits at n/fps s on the shader's clock. A calm shader naps instead: the nap adds
+    // 0.25 s and the request after it draws nothing, so from the first nap on `t` is nominal and `naps` counts them.
+    const stepFrames = async () => {
+      const fps = sh.ir.fps ?? 60, want = new Set(sh.frames), last = Math.max(...sh.frames)
+      let naps = 0
+      report.shader.frames = []
+      report.shader.driver += '; frames stepped by shader-clock.js: fixed clock, fixed noise, no GPU timer'
+      for (tick = 1; drawnTick === null || tick - drawnTick <= last; tick++) {
+        if (drawnTick === null && tick > 600) throw new Error('no frame drawn within 600 frame requests')
+        const r = await ask({ kind: 'preview-frame', at: (tick * 1000) / fps })
+        if (drawnTick !== null && tick > drawnTick && r.waited) naps++
+        const n = drawnTick === null ? null : tick - drawnTick
+        if (n === null || !want.has(n)) continue
+        const s = await ask({ kind: 'preview-save' })
+        const name = `shader-${mode}-${String(n).padStart(4, '0')}`
+        await fetch(`/__save?name=${name}&ext=png`, { method: 'POST', body: s.png })
+        report.shader.frames.push({ n, t: Math.round((n * 1e6) / fps) / 1000, naps, file: `${name}.png`, size: s.size, pixel: s.pixel })
+      }
+      return 'drawn'
+    }
     report.shader.status = await new Promise((ok) => {
-      setTimeout(() => ok('timeout'), 15000)
+      setTimeout(() => ok('timeout'), sh.frames ? 25000 : 15000)
       w.addEventListener('error', (e) => { report.shader.messages.push({ at: at(), error: e.message || 'worker error' }); ok('lost') })
       w.addEventListener('message', ({ data: d }) => {
+        if (d?.preview) { reply?.(d); return }
+        // The worker posts drawn inside the frame it first draws, before that frame's reply.
+        if (sh.frames && d === 'drawn' && drawnTick === null) drawnTick = tick
+        if (sh.frames && d === 'fit' && !report.shader.frames) stepFrames().then(ok, (e) => { report.shader.messages.push({ at: at(), error: e.message }); ok('frames failed') })
+        if (sh.frames && d instanceof ImageData) return
         if (d instanceof ImageData) {
           // Three readbacks after drawn, so the one kept is a frame the shader painted, not the first clear.
           if (drawn && ++readbacks === 3) {

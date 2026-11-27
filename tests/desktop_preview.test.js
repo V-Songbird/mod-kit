@@ -334,6 +334,28 @@ describe("shader playback", () => {
     assert.deepStrictEqual(s.size, s.sizes.at(-1));
     assert.strictEqual(s.sharpness, Math.round((s.size[0] / 960) * 100) / 100);
   });
+
+  // Live, as above. The time fixture paints (fract(time), 0.4, 0.6), so frame n's red is fract(n / 60) at 60 fps.
+  test("--frames gives the same PNG bytes in two runs, and frame n reads fract(n / 60) within 1/255", { timeout: 360000 }, async (t) => {
+    const { findBrowser } = await load("capture.mjs");
+    const { findAsar } = await load("preview.mjs");
+    try { findBrowser(); } catch { return t.skip("no Edge, Chrome or Chromium here"); }
+    try { findAsar(); } catch { return t.skip("no Claude Desktop install here"); }
+    if (cp.spawnSync("claude", ["--version"], { stdio: "ignore" }).status !== 0) return t.skip("no claude CLI on the PATH");
+    const run = () => {
+      const out = tmp();
+      const r = cp.spawnSync(process.execPath, [path.join(DIR, "preview.mjs"), "--shader", path.join(__dirname, "fixtures", "desktop-preview-shader-time"), "--frames", "0,1,30,45", "--shots", out, "--modes", "dark", "--size", "960x600"], { encoding: "utf8", timeout: 170000 });
+      assert.strictEqual(r.status, 0, `${r.stdout}\n${r.stderr}`);
+      return JSON.parse(fs.readFileSync(path.join(out, "shader-frames-dark.json"), "utf8"));
+    };
+    const a = run(), b = run();
+    assert.deepStrictEqual(a.map((f) => f.n), [0, 1, 30, 45]);
+    assert.deepStrictEqual(a.map((f) => f.sha256), b.map((f) => f.sha256));
+    for (const f of a) {
+      const want = [((f.n / 60) % 1) * 255, 102, 153, 255];
+      want.forEach((w, i) => assert.ok(Math.abs(f.pixel[i] - w) <= 1, `frame ${f.n} channel ${i}: ${f.pixel[i]}, want ${w}`));
+    }
+  });
 });
 
 describe("asar reader", () => {

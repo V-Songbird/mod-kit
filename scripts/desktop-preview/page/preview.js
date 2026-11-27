@@ -37,6 +37,34 @@ const measure = (sr) => ({
   inputs: [...sr.querySelectorAll('input')].map((i) => ({ ...box(i), bg: cs(i).backgroundColor, shadow: cs(i).boxShadow })),
   font: cs(sr.host).fontFamily.slice(0, 80),
 })
+// --measure: the player's fields, sampled on the real clock, as the report's shader.runtime. ms per frame is the
+// player's own GPU timer reading, smoothed by the player; fps is frames over the player's own time; a rest is calm
+// passing 90, when the player naps; sharpness is the player's quality times the stage's pixel ratio.
+const r2 = (v) => Math.round(v * 100) / 100
+function runtime(samples, stops, sh, s) {
+  const first = samples[0], last = samples.at(-1), span = (k) => samples.map((x) => x[k])
+  const timed = samples.filter((x) => x.timer && x.gpuMs > 0).map((x) => x.gpuMs)
+  const sharp = span('quality').map((q) => r2(q * s.stage.ratio))
+  let rests = 0, firstRestFrame = null
+  samples.forEach((x, i) => { if (x.calm > 90 && !(i > 0 && samples[i - 1].calm > 90)) { rests++; firstRestFrame ??= x.frame } })
+  return {
+    clock: 'real', windowMs: sh.measure, samples: samples.length,
+    msPerFrame: timed.length ? { mean: r2(timed.reduce((a, b) => a + b, 0) / timed.length), max: r2(Math.max(...timed)) } : null,
+    ...(!timed.length && { msPerFrameMissing: !samples.length ? 'the player gave no sample: it stopped or never drew' : samples.some((x) => x.timer) ? 'the GPU timer gave no reading' : 'no GPU timer (EXT_disjoint_timer_query_webgl2) in this browser' }),
+    // A nap adds 0.25 s to the player's time and draws nothing, so a resting Shader's fps blends awake frames and naps.
+    fps: first && last.time > first.time ? Math.round(((last.frame - first.frame) / (last.time - first.time)) * 10) / 10 : null,
+    fpsWall: first && last.at > first.at ? Math.round(((last.frame - first.frame) / (last.at - first.at)) * 10000) / 10 : null,
+    frames: last?.frame ?? 0,
+    sharpness: { first: sharp[0] ?? null, last: sharp.at(-1) ?? null, min: sharp.length ? Math.min(...sharp) : null, max: sharp.length ? Math.max(...sharp) : null },
+    rests, firstRestFrame,
+    restarts: { count: 0, reimplemented: false, note: 'this page sends one start and no values, so the player is never restarted or cleared; restarts and cooldowns live in the app\'s driver, which this page does not reproduce' },
+    stops,
+    last: last ?? null,
+    renderer: s.gpu, desktop: s.desktop, cli: s.cli, stage: s.stage,
+    control: sh.control,
+  }
+}
+
 try {
   const info = await (await fetch('/__preview-names.json')).json()
   const N = Object.fromEntries(Object.entries(info.names).map(([k, v]) => [k, v.value]))
@@ -76,7 +104,7 @@ try {
   // paints from.
   if (input.shader) {
     const sh = input.shader
-    report.shader = { worker: sh.worker, desktop: sh.desktop, cli: sh.cli, driver: `preview page after PointerBackdrop, not the app${sh.click ? '; one pointer, from --click' : ''}`, messages: [], sizes: [], size: null, sharpness: null, frost: null }
+    report.shader = { worker: sh.worker, desktop: sh.desktop, cli: sh.cli, driver: `preview page after PointerBackdrop, not the app${sh.click ? '; one pointer, from --click' : ''}${sh.measure ? "; a copy of the app's worker with one preview-metrics listener appended, from --measure" : ''}`, messages: [], sizes: [], size: null, sharpness: null, frost: null }
     // --click: the frost cell under the pointer at each readback after drawn, named by what had been sent by then.
     const click = sh.click && (report.shader.click = { ...sh.click, cell: null, pressedAt: null, liftedAt: null, samples: [] })
     let afterClick = 0
@@ -120,10 +148,19 @@ try {
       }
       return 'drawn'
     }
+    // --measure: the patched worker answers preview-metrics with its player's fields; the page asks every 100 ms of the
+    // real clock from the first drawn frame until the window ends or the player stops.
+    const samples = [], stops = []
+    let poll = null
+    const measured = (ok) => {
+      poll = setInterval(() => w.postMessage({ kind: 'preview-metrics' }), 100)
+      setTimeout(() => ok('drawn'), sh.measure)
+    }
     report.shader.status = await new Promise((ok) => {
-      setTimeout(() => ok('timeout'), sh.frames ? 25000 : Math.max(15000, click ? click.t + click.hold + 10000 : 0))
+      setTimeout(() => ok('timeout'), sh.frames ? 25000 : sh.measure ? sh.measure + 8000 : Math.max(15000, click ? click.t + click.hold + 10000 : 0))
       w.addEventListener('error', (e) => { report.shader.messages.push({ at: at(), error: e.message || 'worker error' }); ok('lost') })
       w.addEventListener('message', ({ data: d }) => {
+        if (d?.preview === 'metrics') { if (d.player) samples.push({ at: at(), ...d.player }); return }
         if (d?.preview) { reply?.(d); return }
         // The worker posts drawn inside the frame it first draws, before that frame's reply.
         if (sh.frames && d === 'drawn' && drawnTick === null) drawnTick = tick
@@ -135,7 +172,7 @@ try {
             const sum = [0, 0, 0, 0]
             for (let i = 0; i < d.data.length; i++) sum[i % 4] += d.data[i]
             report.shader.frost = { width: d.width, height: d.height, mean: sum.map((v) => Math.round((v / (d.data.length / 4)) * 100) / 100) }
-            if (!click) ok('drawn')
+            if (!click && !sh.measure) ok('drawn')
           }
           if (click && drawn && afterClick < 3) {
             const [cx, cy] = click.cell = [Math.min(d.width - 1, Math.floor((click.x / report.shader.stage.width) * d.width)), Math.min(d.height - 1, Math.floor((click.y / report.shader.stage.height) * d.height))]
@@ -157,8 +194,8 @@ try {
           cx.fillStyle = cs(img).backgroundColor; cx.fillRect(0, 0, c.width, c.height); cx.drawImage(img, 0, 0, c.width, c.height)
           const picture = c.transferToImageBitmap()
           w.postMessage({ kind: 'underlay', picture, isMoving: false }, [picture])
-        } else if (d === 'drawn') { drawn = true; canvas.style.opacity = '1' }
-        else if (STOPS.includes(d) || (d && typeof d === 'object')) ok(typeof d === 'string' ? d : 'stopped')
+        } else if (d === 'drawn') { drawn = true; canvas.style.opacity = '1'; if (sh.measure && !poll) measured(ok) }
+        else if (STOPS.includes(d) || (d && typeof d === 'object')) { if (typeof d === 'string') stops.push(d); ok(typeof d === 'string' ? d : 'stopped') }
       })
       const off = canvas.transferControlToOffscreen(), b = img.getBoundingClientRect()
       report.shader.stage = { width: b.width, height: b.height, ratio: Math.min(devicePixelRatio, 2) }
@@ -175,8 +212,11 @@ try {
         }, Math.max(0, click.t - at()))
       }
     })
+    clearInterval(poll)
+    if (sh.measure) report.shader.runtime = runtime(samples, stops, sh, report.shader)
     report.steps.push('shader')
-    if (report.shader.status !== 'drawn') throw new Error(`shader: ${report.shader.status}`)
+    // Under --measure a player's stop is a measured outcome, kept in runtime.stops, not a failed run; a refusal still fails.
+    if (report.shader.status !== 'drawn' && !(sh.measure && ['flash', 'slow', 'lost', 'unfit'].includes(report.shader.status))) throw new Error(`shader: ${report.shader.status}`)
   }
 
   // The tree, in the site the engine's own wrapper would give it.

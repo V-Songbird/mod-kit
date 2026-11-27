@@ -55,7 +55,7 @@ export async function capture(shots, outDir, width, height, { reducedMotion = fa
       let buf = ''
       proc.stderr.on('data', (d) => { buf += d; const m = /ws:\/\/\S+/.exec(buf); if (m) ok(m[0]) })
       proc.on('exit', (code, signal) => no(new Error(`browser exited with ${code ?? signal} before DevTools started: ${buf.trim().slice(-400)}`)))
-      setTimeout(() => no(new Error('no DevTools URL within 20 s')), 20000)
+      setTimeout(() => no(new Error(`no DevTools URL within 20 s: ${buf.trim().slice(-400)}`)), 20000)
     })
     ws = new WebSocket(wsUrl)
     await new Promise((ok, no) => { ws.addEventListener('open', ok); ws.addEventListener('error', no) })

@@ -15,6 +15,21 @@ function find(file, src, key, re, groups) {
   return Object.fromEntries(groups.map((g, i) => [g, { value: m[i + 1], file, offset: m.index }]))
 }
 
+/**
+ * --measure: a copy of the worker, beside it, with one listener appended. In the worker's own module scope it reads the
+ * player the worker holds and answers preview-metrics with that player's fields. The worker ignores a kind it does not
+ * know. The player's name is read where the worker creates it; a build without that anchor gives metrics: null.
+ */
+function playerCopy(bundle, worker) {
+  const src = read(path.join(bundle, worker))
+  const m = new RegExp(`(${ID})===null&&\\(\\1=new ${ID}\\(${ID}\\.canvas,`).exec(src)
+  if (!m) return { metrics: null, metricsMissing: `anchor "shader-player" not found in ${worker}` }
+  const p = m[1], file = worker.replace(/shader-worker-[\w-]+\.js$/, '__preview-shader-worker.js')
+  const pick = ['frame', 'time', 'gpuMs', 'quality', 'calm', 'held', 'slowMs', 'late', 'stopped'].map((k) => `${k}:${p}.${k}`).join(',')
+  fs.writeFileSync(path.join(bundle, file), `${src}\nself.addEventListener("message",e=>{e.data?.kind==="preview-metrics"&&self.postMessage({preview:"metrics",player:${p}?{${pick},timer:!!${p}.timer}:null})});\n`)
+  return { metrics: file, player: p }
+}
+
 export function locate(bundle) {
   const v1 = path.join(bundle, 'assets', 'v1')
   const engineFile = firstFile(v1, '.js', 'data-engine-row', 'liftsHoverCards', 'surfaceCss')
@@ -54,7 +69,7 @@ export function locate(bundle) {
   // The Shader player: the module worker the PointerBackdrop chunk starts. Optional, as only --shader needs it.
   const backdropFile = firstFile(v1, '.js', '/assets/shader-worker-', 'PointerBackdrop')
   const worker = backdropFile && /"(\/assets\/shader-worker-[\w-]+\.js)"/.exec(read(path.join(v1, backdropFile)))?.[1]
-  const shader = worker && fs.existsSync(path.join(bundle, worker)) ? { backdropFile, worker } : null
+  const shader = worker && fs.existsSync(path.join(bundle, worker)) ? { backdropFile, worker, ...playerCopy(bundle, worker) } : null
   const out = { engineFile, sitesFile, themeFile, sheets: [...new Set([...linked, ...extra])], names: n, shader }
   fs.writeFileSync(path.join(bundle, '__preview-names.json'), JSON.stringify(out, null, 1))
   return out

@@ -75,7 +75,7 @@ try {
   // as still. isFrosted is on, so the worker posts the 64x40 readback the app's glass paints from.
   if (input.shader) {
     const sh = input.shader
-    report.shader = { worker: sh.worker, desktop: sh.desktop, cli: sh.cli, driver: 'preview page after PointerBackdrop, not the app', messages: [], frost: null }
+    report.shader = { worker: sh.worker, desktop: sh.desktop, cli: sh.cli, driver: 'preview page after PointerBackdrop, not the app', messages: [], sizes: [], size: null, sharpness: null, frost: null }
     const gl = document.createElement('canvas').getContext('webgl2'), dbg = gl?.getExtension('WEBGL_debug_renderer_info')
     report.shader.gpu = gl ? gl.getParameter(dbg ? dbg.UNMASKED_RENDERER_WEBGL : gl.RENDERER) : 'no WebGL2'
     const layer = S('backdropLayer')(document)
@@ -109,6 +109,10 @@ try {
         }
         report.shader.messages.push({ at: at(), msg: d })
         if (Array.isArray(d)) {
+          // The worker's drawing size; it can grow again after a while. Sharpness is its width over the stage's CSS
+          // width, the figure validate prints as sharpness. The driver names no GPU class, so no tier is claimed.
+          report.shader.sizes.push(d); report.shader.size = d
+          report.shader.sharpness = Math.round((d[0] / report.shader.stage.width) * 100) / 100
           const c = new OffscreenCanvas(Math.ceil(d[0]), Math.ceil(d[1])), cx = c.getContext('2d')
           cx.fillStyle = cs(img).backgroundColor; cx.fillRect(0, 0, c.width, c.height); cx.drawImage(img, 0, 0, c.width, c.height)
           const picture = c.transferToImageBitmap()
@@ -117,8 +121,9 @@ try {
         else if (STOPS.includes(d) || (d && typeof d === 'object')) ok(typeof d === 'string' ? d : 'stopped')
       })
       const off = canvas.transferControlToOffscreen(), b = img.getBoundingClientRect()
+      report.shader.stage = { width: b.width, height: b.height, ratio: Math.min(devicePixelRatio, 2) }
       w.postMessage({ kind: 'start', canvas: off, shader: { ir: sh.ir, values: sh.values }, gpu: undefined, carried: undefined, isFrosted: true }, [off])
-      w.postMessage({ kind: 'stage', stage: { width: b.width, height: b.height, ratio: Math.min(devicePixelRatio, 2), isPictured: img.complete, composer: undefined, veils: [] } })
+      w.postMessage({ kind: 'stage', stage: { ...report.shader.stage, isPictured: img.complete, composer: undefined, veils: [] } })
       w.postMessage({ kind: 'pause', isPaused: false })
     })
     report.steps.push('shader')

@@ -31,6 +31,7 @@ Mod Kit ships one skill and one agent that the assistant reads, and one script, 
 | Check a mod before you share it | "Audit the mod in `my-mod/`" |
 | Find out why a mod draws wrong | "Why do my mod's buttons touch?" |
 | Learn what the docs leave out | "What do the mods pages say that `plugin-authoring` does not?" |
+| See an animation frame by frame | "Show my band after 0, 2 and 5 turns, with its drawing at 0, 0.5 and 1 second" |
 
 Mod Kit has no settings.
 
@@ -46,6 +47,8 @@ Why you would want it:
 | The skill `mod-native-guide` | A skill is a guide the assistant loads when a task matches it. This one holds the rules, recipes and traps for what a mod draws, on the desktop app and in the terminal. |
 | The agent `mod-auditor` | A subagent, which is a helper the assistant starts for one job. It reads a mod's source and never edits it. |
 | The Desktop preview | A script the skill runs to draw a mod or a theme with the Claude desktop app installed on your computer, without opening it. It saves pictures the assistant can measure. It is not the app, so a screenshot still decides. |
+
+The preview can also save one picture per moment of an animation, and a video when `ffmpeg` is installed. It pauses every animation at that moment first, so the same input always gives the same pictures. The preview never runs your mod. A test of the mod walks it through the states, such as time passing, turns ending or tokens growing, and writes down what it draws at each one. Some things never show in a preview: a theme's scene in motion, a `Shader`, hover, and the window around the chat. A picture's look is settled only by a screenshot of the app.
 
 A mod is a plugin that draws inside Claude Code: a band above the prompt, a pane beside the chat, a toast, a theme. The types say what each element accepts, but not how the Claude desktop app draws it. With Mod Kit the assistant starts from rules measured on the desktop app and the terminal, and paints with theme keys, the named colors that follow light and dark.
 

@@ -5,9 +5,11 @@
 // with Mod Kit or written into a repository.
 //
 // usage: node preview.mjs [--tree <tree.json>] [--site pane|band] [--theme <theme.json>] [--settings user]
+//                         [--timeline <timeline.json> | --times <ms,ms,...>] [--reduced-motion] [--video]
 //                         [--shots <dir>] [--modes light,dark] [--size 1628x1348]
 //                         [--asar <ion-dist.asar>] [--cache <dir>] [--port <n>]
 // With --shots it captures each mode and exits; without it, it serves until stopped.
+// With --timeline or --times it captures one PNG per frame, with every animation paused at the frame's time.
 import { execFileSync, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import http from 'node:http'
@@ -66,11 +68,59 @@ export function prepareBundle({ asar, version, cache = path.join(os.tmpdir(), 'm
 }
 
 /** Reads the inputs: a tree file holds a node or { tree }, a theme file holds the $.theme.set argument plus an optional backdropTree. */
-export function readInput({ tree, site = 'pane', theme, settings }) {
-  if (!['pane', 'band'].includes(site)) throw new Error(`--site must be pane or band, not ${site}`)
+export function readInput({ tree, site, theme, settings, timeline, times }) {
   const json = (f) => JSON.parse(fs.readFileSync(f, 'utf8'))
+  const tl = timeline ? json(timeline) : null
+  site = site ?? tl?.site ?? 'pane'
+  if (!['pane', 'band'].includes(site)) throw new Error(`--site must be pane or band, not ${site}`)
   const t = tree ? json(tree) : null
-  return { tree: t ? (t.type ? t : t.tree) : null, site, theme: theme ? json(theme) : null, settings: settings === 'user' ? readSettings() : null }
+  const input = { tree: t ? (t.type ? t : t.tree) : null, site, theme: theme ? json(theme) : null, settings: settings === 'user' ? readSettings() : null }
+  if (tl) input.frames = resolveTimeline({ tree: input.tree, theme: input.theme, ...tl })
+  else if (times) input.frames = resolveTimeline({ tree: input.tree, theme: input.theme, frames: times.split(',').map((s) => ({ t: Number(s) })) })
+  return input
+}
+
+/**
+ * Resolves a timeline into one full input per frame. A frame holds `t`, ms on the mod's clock, and `tree` or `theme`
+ * when they changed; what it leaves out carries over. A tree that differs from the one before is a redraw, which
+ * restarts every animation, so `svgTime` counts from the tree's last change. One given again unchanged is no redraw.
+ * The theme's scene is drawn still, so a theme change moves no clock.
+ */
+export function resolveTimeline({ tree = null, theme = null, frames }) {
+  if (!Array.isArray(frames) || frames.length === 0) throw new Error('a timeline needs a non-empty frames list')
+  let since = 0 // a tree given outside the frames is drawn at 0
+  return frames.map((f, i) => {
+    if (!Number.isFinite(f.t) || f.t < 0 || (i > 0 && f.t < frames[i - 1].t)) throw new Error(`frame ${i}: t must be a number of ms, 0 or more, not below the frame before`)
+    if ('tree' in f) { const next = f.tree?.type ? f.tree : f.tree?.tree ?? null; if (JSON.stringify(next) !== JSON.stringify(tree)) { tree = next; since = f.t } }
+    if ('theme' in f) theme = f.theme
+    return { t: f.t, svgTime: f.t - since, tree, theme }
+  })
+}
+
+/**
+ * The ffmpeg concat list that shows each frame until the next one's t; the last frame keeps the gap before it.
+ * Each frame repeats once per tick, the largest step that divides every gap, at most 60 a second, so a fixed frame
+ * rate holds every gap exactly; ffmpeg drops a lone entry's duration otherwise. `seconds` is the length to cut at.
+ */
+export function concatList(files, times) {
+  const gaps = times.map((t, i) => (i + 1 < times.length ? times[i + 1] - t : times.length > 1 ? t - times[i - 1] : 1000) || 1)
+  const gcd = (a, b) => (b ? gcd(b, a % b) : a)
+  const tick = Math.max(gaps.reduce(gcd), 1000 / 60)
+  const line = (f) => `file '${f.replaceAll('\\', '/').replaceAll("'", "'\\''")}'\nduration ${(tick / 1000).toFixed(6)}`
+  const body = files.flatMap((f, i) => Array.from({ length: Math.max(1, Math.round(gaps[i] / tick)) }, () => line(f)))
+  return { list: `${[...body, body.at(-1).split('\n')[0]].join('\n')}\n`, fps: 1000 / tick, seconds: (body.length * tick) / 1000 }
+}
+
+/** Joins one mode's frames into an MP4 with ffmpeg from the PATH; returns null when there is none. */
+export function makeVideo(files, times, out) {
+  if (spawnSync('ffmpeg', ['-version'], { stdio: 'ignore' }).status !== 0) return null
+  const list = `${out}.txt`
+  const { list: text, fps, seconds } = concatList(files, times)
+  fs.writeFileSync(list, text)
+  const r = spawnSync('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', list, '-vf', 'format=yuv420p', '-fps_mode', 'cfr', '-r', String(fps), '-t', String(seconds), out], { encoding: 'utf8' })
+  fs.rmSync(list, { force: true })
+  if (r.status !== 0) throw new Error(`ffmpeg failed: ${r.stderr.trim().slice(0, 400)}`)
+  return out
 }
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.otf': 'font/otf', '.png': 'image/png', '.webp': 'image/webp', '.ico': 'image/x-icon' }
@@ -89,7 +139,11 @@ export function startServer({ bundle, input, saveDir, port = 0 }) {
       return
     }
     if (req.method !== 'GET') return res.writeHead(405).end()
-    if (url.pathname === '/__input.json') return res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(input))
+    if (url.pathname === '/__input.json') {
+      const { frames, ...rest } = input
+      const f = frames?.[Number(url.searchParams.get('frame'))]
+      return res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(f ? { ...rest, ...f } : rest))
+    }
     let rel
     try { rel = decodeURIComponent(url.pathname === '/' ? '/preview.html' : url.pathname) } catch { return res.writeHead(400).end() }
     const root = rel === '/preview.html' || rel === '/preview.js' ? PAGE : bundle
@@ -109,18 +163,34 @@ async function main(argv) {
   const { cache, bundle, found } = prepareBundle({ asar, version, cache: arg('cache') })
   console.log(`Claude Desktop ${version}: engine ${found.engineFile}, sites ${found.sitesFile}, theme ${found.themeFile}`)
   console.log(`cache ${cache}`)
-  const input = readInput({ tree: arg('tree'), site: arg('site'), theme: arg('theme'), settings: arg('settings') })
+  const input = readInput({ tree: arg('tree'), site: arg('site'), theme: arg('theme'), settings: arg('settings'), timeline: arg('timeline'), times: arg('times') })
   const shots = arg('shots')
   const server = await startServer({ bundle, input, saveDir: shots ? path.resolve(shots) : path.join(cache, 'out'), port: Number(arg('port', shots ? 0 : 4173)) })
   const base = `http://127.0.0.1:${server.address().port}`
   if (!shots) { console.log(`${base}/preview.html?mode=light  ${base}/preview.html?mode=dark`); return }
   const modes = arg('modes', input.settings ? input.settings.mode : 'light,dark').split(',')
   const [w, h] = arg('size', '1628x1348').split('x').map(Number)
+  const reducedMotion = argv.includes('--reduced-motion')
+  const out = path.resolve(shots)
+  const list = input.frames
+    ? modes.flatMap((m) => input.frames.map((f, i) => ({ url: `${base}/preview.html?mode=${m}&frame=${i}`, name: `frame-${String(i).padStart(4, '0')}-${m}`, mode: m, t: f.t, svgTime: f.svgTime })))
+    : modes.map((m) => ({ url: `${base}/preview.html?mode=${m}`, name: `preview-${m}`, mode: m }))
+  let failed = false
   try {
-    for (const r of await capture(modes.map((m) => ({ url: `${base}/preview.html?mode=${m}`, name: `preview-${m}` })), path.resolve(shots), w, h)) console.log(`${r.file}\t${r.status}`)
+    const results = await capture(list, out, w, h, { reducedMotion })
+    for (const r of results) { console.log(`${r.file}\t${r.status}\t${r.sha256}`); failed ||= r.status !== 'ok' }
+    if (input.frames) {
+      fs.writeFileSync(path.join(out, 'frames.json'), JSON.stringify({ reducedMotion, frames: results }, null, 1))
+      if (argv.includes('--video')) for (const m of modes) {
+        const mine = results.filter((r) => r.mode === m)
+        const video = makeVideo(mine.map((r) => r.file), mine.map((r) => r.t), path.join(out, `video-${m}.mp4`))
+        console.log(video ?? 'ffmpeg is not on the PATH: no video, the PNG frames stay')
+      }
+    }
   } finally {
     server.close()
   }
+  if (failed) process.exitCode = 1
 }
 
 if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {

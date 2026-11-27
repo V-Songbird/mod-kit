@@ -18,6 +18,11 @@ const load = (name) => import(pathToFileURL(path.join(DIR, name)).href);
 const made = [];
 const tmp = () => { const d = fs.mkdtempSync(path.join(os.tmpdir(), "mod-kit-preview-test-")); made.push(d); return d; };
 after(() => { for (const d of made) fs.rmSync(d, { recursive: true, force: true }); });
+const get = (port, pathName, host) => new Promise((ok, no) => {
+  http.get({ host: "127.0.0.1", port, path: pathName, headers: { host: host ?? `127.0.0.1:${port}` } }, (res) => {
+    let body = ""; res.on("data", (d) => { body += d; }); res.on("end", () => ok({ status: res.statusCode, body }));
+  }).on("error", no);
+});
 
 // --- LevelDB writers for the fixtures ---
 const varint = (n) => { const out = []; while (n >= 0x80) { out.push((n & 0x7f) | 0x80); n = Math.floor(n / 128); } out.push(n); return Buffer.from(out); };
@@ -149,12 +154,6 @@ describe("preview cache and server", () => {
     assert.doesNotThrow(() => assertOutsideGit(path.join(tmp(), "cache")));
   });
 
-  const get = (port, pathName, host) => new Promise((ok, no) => {
-    http.get({ host: "127.0.0.1", port, path: pathName, headers: { host: host ?? `127.0.0.1:${port}` } }, (res) => {
-      let body = ""; res.on("data", (d) => { body += d; }); res.on("end", () => ok({ status: res.statusCode, body }));
-    }).on("error", no);
-  });
-
   test("serves its page, the bundle and the inputs, and nothing to another host or outside the bundle", async () => {
     const { startServer } = await load("preview.mjs");
     const outer = tmp();
@@ -171,6 +170,84 @@ describe("preview cache and server", () => {
       assert.strictEqual(JSON.parse((await get(port, "/__input.json")).body).site, "pane");
       assert.strictEqual((await get(port, "/__input.json", "attacker.example")).status, 403);
       assert.strictEqual((await get(port, "/..%2fbundle-secret.txt")).status, 403);
+    } finally {
+      server.close();
+    }
+  });
+});
+
+describe("timeline", () => {
+  const tree = (n) => ({ type: "Box", props: {}, children: [String(n)] });
+
+  test("carries a frame's tree and theme forward and restarts the Svg clock when the tree changes, not when repeated", async () => {
+    const { resolveTimeline } = await load("preview.mjs");
+    const f = resolveTimeline({ frames: [{ t: 100, tree: tree(1) }, { t: 350, tree: tree(1) }, { t: 600, tree: { tree: tree(2) } }, { t: 900, theme: { colors: {} } }, { t: 1000 }] });
+    assert.deepStrictEqual(f.map((x) => x.svgTime), [0, 250, 0, 300, 400]);
+    assert.deepStrictEqual(f.map((x) => x.tree.children[0]), ["1", "1", "2", "2", "2"]);
+    assert.deepStrictEqual(f.map((x) => x.theme), [null, null, null, { colors: {} }, { colors: {} }]);
+  });
+
+  test("the SMIL fixture gives the expected Svg clock per frame", async () => {
+    const { readInput } = await load("preview.mjs");
+    const input = readInput({ timeline: path.join(__dirname, "fixtures", "desktop-preview-smil-timeline.json") });
+    assert.strictEqual(input.site, "band");
+    assert.deepStrictEqual(input.frames.map((x) => x.svgTime), [0, 250, 500, 750, 1000, 1500, 0]);
+  });
+
+  test("refuses an empty list and a time that goes back", async () => {
+    const { resolveTimeline } = await load("preview.mjs");
+    assert.throws(() => resolveTimeline({ frames: [] }), /non-empty/);
+    assert.throws(() => resolveTimeline({ frames: [{ t: 10 }, { t: 5 }] }), /frame 1/);
+  });
+
+  test("--times draws the given tree at each time with no redraw", async () => {
+    const { readInput } = await load("preview.mjs");
+    const file = path.join(tmp(), "tree.json");
+    fs.writeFileSync(file, JSON.stringify(tree(7)));
+    const input = readInput({ tree: file, times: "250,1000" });
+    assert.deepStrictEqual(input.frames.map((x) => [x.t, x.svgTime, x.tree.children[0]]), [[250, 250, "7"], [1000, 1000, "7"]]);
+  });
+
+  test("the ffmpeg list holds each frame for its gap at a rate that divides every gap", async () => {
+    const { concatList } = await load("preview.mjs");
+    const r = concatList(["C:\\o\\a.png", "/o/b'.png", "/o/c.png"], [0, 250, 750]);
+    assert.deepStrictEqual([r.fps, r.seconds], [4, 1.25]);
+    const files = r.list.split("\n").filter((l) => l.startsWith("file"));
+    assert.deepStrictEqual(files, ["file 'C:/o/a.png'", "file '/o/b'\\''.png'", "file '/o/b'\\''.png'", "file '/o/c.png'", "file '/o/c.png'", "file '/o/c.png'"]);
+  });
+
+  test("the server gives each frame its own input", async () => {
+    const { startServer } = await load("preview.mjs");
+    const server = await startServer({ bundle: tmp(), input: { site: "band", tree: null, frames: [{ t: 0, svgTime: 0, tree: tree(1) }, { t: 9, svgTime: 9, tree: tree(2) }] }, saveDir: tmp() });
+    const { port } = server.address();
+    try {
+      const one = JSON.parse((await get(port, "/__input.json?frame=1")).body);
+      assert.deepStrictEqual([one.site, one.t, one.tree.children[0], one.frames], ["band", 9, "2", undefined]);
+    } finally {
+      server.close();
+    }
+  });
+});
+
+describe("frame capture", () => {
+  // A page of our own: a SMIL square in a sandboxed iframe, as the app draws an interactive Svg. No app code.
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="20"><rect id="sq" width="20" height="20" fill="red"><animate attributeName="x" from="0" to="100" dur="1s" fill="freeze"/></rect></svg>';
+  const page = `<!doctype html><iframe sandbox="" srcdoc='${svg}'></iframe><script>onload=()=>{window.__report={iframes:1};window.__done=true}</script>`;
+  test("pauses a sandboxed frame's SMIL at the asked time, twice with the same bytes, with reduced motion as asked", async (t) => {
+    const { capture, findBrowser } = await load("capture.mjs");
+    try { findBrowser(); } catch { return t.skip("no Edge, Chrome or Chromium here"); }
+    const server = http.createServer((q, r) => r.writeHead(200, { "content-type": "text/html" }).end(page));
+    await new Promise((ok) => server.listen(0, "127.0.0.1", ok));
+    const url = `http://127.0.0.1:${server.address().port}/`;
+    try {
+      const out = tmp();
+      // GitHub's Ubuntu runners allow no sandbox for Chrome; only the test, never the preview, turns it off there.
+      const browserArgs = process.platform === "linux" && process.env.CI ? ["--no-sandbox"] : [];
+      const r = await capture([{ url, name: "a", svgTime: 250 }, { url, name: "b", svgTime: 250 }], out, 320, 200, { reducedMotion: true, browserArgs });
+      assert.deepStrictEqual(r.map((x) => x.status), ["ok", "ok"]);
+      assert.deepStrictEqual(r[0].seek.flatMap((d) => d.smil), [{ id: "sq", attribute: "x", value: 25 }]);
+      assert.ok(r[0].seek.every((d) => d.reduced === true));
+      assert.strictEqual(r[0].sha256, r[1].sha256);
     } finally {
       server.close();
     }

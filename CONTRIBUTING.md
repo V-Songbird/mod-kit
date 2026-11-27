@@ -72,6 +72,8 @@ node scripts/git-hooks/check-readme-nav.js
 
 A pull request that changes behavior without updating its tests is not merged.
 
+One preview test starts a headless Edge, Chrome or Chromium on a page of its own, and skips when none is installed. No test reads the Claude Desktop app.
+
 CI runs `.github/workflows/test.yml` on pushes and pull requests to `main`. Its `suite` job runs on Linux and Windows with Node 22. It parses `.claude-plugin/plugin.json`, runs the README nav check and runs `node --test tests/*.test.js`. Its `private-details` job scans each pull request for private details. The `test` job passes only when both succeed.
 
 Validate the package for Claude Code with `claude plugin validate .`. `claude plugin test .` does not apply, because it needs a hooks module and Mod Kit has none. Mod Kit has no Codex or Antigravity package to validate.

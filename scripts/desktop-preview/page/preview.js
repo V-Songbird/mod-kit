@@ -5,7 +5,8 @@
 //   backdrop -> the engine builder with the backdrop site's CSS and shaper, in the layer the app creates
 // Then it measures what was drawn and saves the report. Query: ?mode=light|dark&font=system|anthropic
 const q = new URLSearchParams(location.search)
-const input = await (await fetch('/__input.json')).json()
+const frameNo = q.get('frame')
+const input = await (await fetch(frameNo === null ? '/__input.json' : `/__input.json?frame=${frameNo}`)).json()
 const user = input.settings
 const root = document.documentElement
 const mode = q.get('mode') ?? user?.mode ?? 'light'
@@ -97,11 +98,33 @@ try {
   await new Promise((ok) => setTimeout(ok, 1500))
   Object.assign(report, measure(host.shadowRoot))
   report.region = { ...box(region), bg: cs(region).backgroundColor, radius: cs(region).borderRadius }
+  if (frameNo !== null) {
+    // An Svg without isInteractive is an <img>, whose clock no script can pause. For a frame, each one is redrawn as a
+    // sandboxed document of the same box, size and color scheme, which the capture can pause. Not the app's own path.
+    report.t = input.t; report.svgTime = input.svgTime
+    const roots = [document]
+    for (let i = 0; i < roots.length; i++) for (const el of roots[i].querySelectorAll('*')) if (el.shadowRoot) roots.push(el.shadowRoot)
+    const loads = []
+    report.redrawnImages = 0
+    for (const root of roots) for (const img of root.querySelectorAll('img[src^="data:image/svg+xml"]')) {
+      const b = img.getBoundingClientRect(), st = cs(img)
+      const frameEl = document.createElement('iframe')
+      frameEl.setAttribute('sandbox', '')
+      frameEl.style.cssText = img.style.cssText
+      Object.assign(frameEl.style, { display: st.display === 'inline' ? 'inline-block' : st.display, width: `${b.width}px`, height: `${b.height}px`, border: '0', margin: st.margin, flex: st.flex, alignSelf: st.alignSelf, verticalAlign: st.verticalAlign, colorScheme: st.colorScheme })
+      frameEl.srcdoc = `<!doctype html><style>:root{color-scheme:${st.colorScheme};color:#000}html,body{margin:0;height:100%;overflow:hidden;background:transparent}body>svg{display:block;width:100%;height:100%}</style>${decodeURIComponent(img.src.slice(img.src.indexOf(',') + 1))}`
+      loads.push(new Promise((ok) => { frameEl.onload = ok; setTimeout(ok, 5000) }))
+      img.replaceWith(frameEl)
+      report.redrawnImages++
+    }
+    await Promise.all(loads)
+    report.iframes = roots.reduce((n, r) => n + r.querySelectorAll('iframe').length, 0)
+  }
   report.page = { dpr: devicePixelRatio, userAgent: navigator.userAgent, fonts: [...document.fonts].filter((f) => f.status === 'loaded').map((f) => `${f.family} ${f.weight}`) }
 } catch (e) {
   report.failed = String(e?.stack ?? e).slice(0, 800)
 }
 document.getElementById('out').textContent = JSON.stringify(report, null, 1)
 window.__report = report
-await fetch(`/__save?name=preview-${mode}`, { method: 'POST', body: JSON.stringify(report, null, 1) })
+await fetch(`/__save?name=${frameNo === null ? 'preview' : `frame-${frameNo.padStart(4, '0')}`}-${mode}`, { method: 'POST', body: JSON.stringify(report, null, 1) })
 window.__done = true

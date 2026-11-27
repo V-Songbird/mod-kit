@@ -94,7 +94,7 @@ describe("settings reader", () => {
 });
 
 // A bundle whose chunks hold every anchor the locator reads, written for this test.
-function fakeBundle({ drop } = {}) {
+function fakeBundle({ drop, shader } = {}) {
   const bundle = tmp();
   const v1 = path.join(bundle, "assets", "v1");
   fs.mkdirSync(v1, { recursive: true });
@@ -121,6 +121,10 @@ function fakeBundle({ drop } = {}) {
     'function Ji(e){let t=Q(e,"data-engine-backdrop-on")}',
   ].join("\n"));
   fs.writeFileSync(path.join(v1, "theme.js"), 'function at(n,o={}){if(o.target===void 0&&typeof document>"u")throw Error("applyTheme needs a document")}export{at as t};');
+  if (shader) {
+    fs.writeFileSync(path.join(v1, "backdrop.js"), 'var D="/assets/shader-worker-Ab_1.js";function U(){}export{U as PointerBackdrop};');
+    if (shader === "with worker") fs.writeFileSync(path.join(bundle, "assets", "shader-worker-Ab_1.js"), "");
+  }
   return bundle;
 }
 
@@ -142,6 +146,62 @@ describe("locator", () => {
   test("a build without an anchor fails with that anchor's name", async () => {
     const { locate } = await load("locate.mjs");
     assert.throws(() => locate(fakeBundle({ drop: 2 })), /anchor "build" not found in engine\.js/);
+  });
+
+  test("finds the shader worker through the PointerBackdrop chunk, and gives null when it is missing", async () => {
+    const { locate } = await load("locate.mjs");
+    assert.deepStrictEqual(locate(fakeBundle({ shader: "with worker" })).shader, { backdropFile: "backdrop.js", worker: "/assets/shader-worker-Ab_1.js" });
+    assert.strictEqual(locate(fakeBundle({ shader: "chunk only" })).shader, null);
+    assert.strictEqual(locate(fakeBundle()).shader, null);
+  });
+});
+
+describe("shader request", () => {
+  // A stand-in CLI: prints a version, answers each control request on stdin, and logs what it was sent.
+  const stub = (backdropTree) => {
+    const dir = tmp();
+    const file = path.join(dir, "cli.js");
+    fs.writeFileSync(file, `
+const fs = require("node:fs");
+if (process.argv.includes("--version")) { console.log("9.9.9 (stub)"); process.exit(0); }
+const log = ${JSON.stringify(path.join(dir, "log.json"))};
+const seen = { argv: process.argv.slice(2), requests: [] };
+let buf = "";
+process.stdin.on("data", (d) => {
+  buf += d;
+  for (let i; (i = buf.indexOf("\\n")) >= 0;) {
+    const m = JSON.parse(buf.slice(0, i)); buf = buf.slice(i + 1);
+    seen.requests.push(m.request); fs.writeFileSync(log, JSON.stringify(seen));
+    const response = m.request.subtype === "ui_render" ? { tree: ${JSON.stringify(backdropTree)} } : {};
+    console.log(JSON.stringify({ type: "system", subtype: "noise" }));
+    console.log(JSON.stringify({ type: "control_response", response: { subtype: "success", request_id: m.request_id, response } }));
+  }
+});
+setInterval(() => {}, 1000);`);
+    return { command: [process.execPath, file], log: () => JSON.parse(fs.readFileSync(path.join(dir, "log.json"), "utf8")) };
+  };
+  const fixture = path.join(__dirname, "fixtures", "desktop-preview-shader");
+  const shaderTree = { type: "Shader", props: { ir: { passes: [] }, values: [0.5] }, children: [{ type: "Svg", props: { source: "<svg/>" } }] };
+
+  test("attaches as a desktop client that draws Theme and Shader, asks for the backdrop, and loads a copy of the plugin", async () => {
+    const { fetchShader } = await load("preview.mjs");
+    const s = stub(shaderTree);
+    const r = await fetchShader({ pluginDir: fixture, theme: { backdrop: { glass: { blur: 6 } } }, command: s.command });
+    assert.deepStrictEqual(r, { ir: { passes: [] }, values: [0.5], svg: "<svg/>", cli: "9.9.9 (stub)" });
+    const seen = s.log();
+    assert.deepStrictEqual(seen.requests.map((q) => q.subtype), ["initialize", "ui_attach", "ui_render"]);
+    assert.deepStrictEqual(seen.requests[1].draws, ["Theme", "Shader"]);
+    assert.deepStrictEqual([seen.requests[2].component, seen.requests[2].instance_id, seen.requests[2].props], ["Theme", "backdrop", { glass: { blur: 6 }, scene: "preview-shader-fixture", plugin: "preview-shader-fixture" }]);
+    assert.strictEqual(seen.argv[seen.argv.indexOf("--setting-sources") + 1], "project", "installed plugins cannot answer for the given one");
+    const dir = seen.argv[seen.argv.indexOf("--plugin-dir") + 1];
+    assert.notStrictEqual(path.resolve(dir), path.resolve(fixture));
+    assert.strictEqual(fs.existsSync(dir), false, "the copy is removed afterwards");
+  });
+
+  test("refuses an answer that is not a Shader, and a folder that is not a plugin", async () => {
+    const { fetchShader } = await load("preview.mjs");
+    await assert.rejects(fetchShader({ pluginDir: fixture, command: stub({ type: "Svg", props: { source: "<svg/>" } }).command }), /answered Svg, not a Shader/);
+    await assert.rejects(fetchShader({ pluginDir: tmp(), command: stub(shaderTree).command }), /plugin folder/);
   });
 });
 
@@ -251,6 +311,26 @@ describe("frame capture", () => {
     } finally {
       server.close();
     }
+  });
+});
+
+describe("shader playback", () => {
+  // Live: this computer's Desktop worker, its CLI and a browser. The fixture paints rgb(51, 102, 153) everywhere.
+  test("the flat fixture's 64x40 frost readback is its color within 1/255, after fit and drawn", { timeout: 180000 }, async (t) => {
+    const { findBrowser } = await load("capture.mjs");
+    const { findAsar } = await load("preview.mjs");
+    try { findBrowser(); } catch { return t.skip("no Edge, Chrome or Chromium here"); }
+    try { findAsar(); } catch { return t.skip("no Claude Desktop install here"); }
+    if (cp.spawnSync("claude", ["--version"], { stdio: "ignore" }).status !== 0) return t.skip("no claude CLI on the PATH");
+    const out = tmp();
+    const r = cp.spawnSync(process.execPath, [path.join(DIR, "preview.mjs"), "--shader", path.join(__dirname, "fixtures", "desktop-preview-shader"), "--shots", out, "--modes", "dark", "--size", "960x600"], { encoding: "utf8", timeout: 170000 });
+    assert.strictEqual(r.status, 0, `${r.stdout}\n${r.stderr}`);
+    const s = JSON.parse(fs.readFileSync(path.join(out, "preview-dark.json"), "utf8")).shader;
+    const said = s.messages.map((m) => m.msg);
+    assert.ok(said.includes("fit") && said.includes("drawn"), JSON.stringify(said));
+    assert.deepStrictEqual([s.frost.width, s.frost.height], [64, 40]);
+    [51, 102, 153, 255].forEach((want, i) => assert.ok(Math.abs(s.frost.mean[i] - want) <= 1, `channel ${i}: ${s.frost.mean[i]}, want ${want}`));
+    for (const k of ["gpu", "desktop", "cli", "worker"]) assert.ok(s[k], `report names the ${k}`);
   });
 });
 

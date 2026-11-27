@@ -69,6 +69,62 @@ try {
     await new Promise((ok) => { const img = host.shadowRoot.querySelector('img'); if (!img || img.complete) ok(); else { img.onload = img.onerror = ok } })
   }
 
+  // The Shader, in the app's own worker, driven with the messages the PointerBackdrop chunk sends: start, stage,
+  // pause, then underlay (the Svg over the surface color) once the worker names its size. The driver is this page,
+  // not the app's own path: it sends no composer box, no veils, no pointer and no GPU class, and it treats the Svg
+  // as still. isFrosted is on, so the worker posts the 64x40 readback the app's glass paints from.
+  if (input.shader) {
+    const sh = input.shader
+    report.shader = { worker: sh.worker, desktop: sh.desktop, cli: sh.cli, driver: 'preview page after PointerBackdrop, not the app', messages: [], frost: null }
+    const gl = document.createElement('canvas').getContext('webgl2'), dbg = gl?.getExtension('WEBGL_debug_renderer_info')
+    report.shader.gpu = gl ? gl.getParameter(dbg ? dbg.UNMASKED_RENDERER_WEBGL : gl.RENDERER) : 'no WebGL2'
+    const layer = S('backdropLayer')(document)
+    ground.prepend(layer)
+    S('backdropMark')(layer, theme.backdrop?.scene ?? 'shader')
+    const holder = document.createElement('div'); holder.className = 'absolute inset-0'
+    const img = document.createElement('img'); img.alt = ''; img.className = 'absolute inset-0 size-full bg-surface-1 opacity-0'
+    const canvas = document.createElement('canvas'); canvas.className = 'absolute inset-0 size-full opacity-0'
+    holder.append(img, canvas); layer.appendChild(holder)
+    if (theme.backdrop?.glass) { S('glass')(frame, theme.backdrop.glass, mode); report.steps.push('glass') }
+    S('backdropOn')(frame)
+    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(sh.svg)}`
+    await img.decode().catch(() => {})
+    const t0 = performance.now(), at = () => Math.round(performance.now() - t0)
+    const w = new Worker(sh.worker, { type: 'module', name: 'backdrop' })
+    const STOPS = ['refused', 'unfit', 'flash', 'slow', 'lost']
+    let drawn = false, readbacks = 0
+    report.shader.status = await new Promise((ok) => {
+      setTimeout(() => ok('timeout'), 15000)
+      w.addEventListener('error', (e) => { report.shader.messages.push({ at: at(), error: e.message || 'worker error' }); ok('lost') })
+      w.addEventListener('message', ({ data: d }) => {
+        if (d instanceof ImageData) {
+          // Three readbacks after drawn, so the one kept is a frame the shader painted, not the first clear.
+          if (drawn && ++readbacks === 3) {
+            const sum = [0, 0, 0, 0]
+            for (let i = 0; i < d.data.length; i++) sum[i % 4] += d.data[i]
+            report.shader.frost = { width: d.width, height: d.height, mean: sum.map((v) => Math.round((v / (d.data.length / 4)) * 100) / 100) }
+            ok('drawn')
+          }
+          return
+        }
+        report.shader.messages.push({ at: at(), msg: d })
+        if (Array.isArray(d)) {
+          const c = new OffscreenCanvas(Math.ceil(d[0]), Math.ceil(d[1])), cx = c.getContext('2d')
+          cx.fillStyle = cs(img).backgroundColor; cx.fillRect(0, 0, c.width, c.height); cx.drawImage(img, 0, 0, c.width, c.height)
+          const picture = c.transferToImageBitmap()
+          w.postMessage({ kind: 'underlay', picture, isMoving: false }, [picture])
+        } else if (d === 'drawn') { drawn = true; canvas.style.opacity = '1' }
+        else if (STOPS.includes(d) || (d && typeof d === 'object')) ok(typeof d === 'string' ? d : 'stopped')
+      })
+      const off = canvas.transferControlToOffscreen(), b = img.getBoundingClientRect()
+      w.postMessage({ kind: 'start', canvas: off, shader: { ir: sh.ir, values: sh.values }, gpu: undefined, carried: undefined, isFrosted: true }, [off])
+      w.postMessage({ kind: 'stage', stage: { width: b.width, height: b.height, ratio: Math.min(devicePixelRatio, 2), isPictured: img.complete, composer: undefined, veils: [] } })
+      w.postMessage({ kind: 'pause', isPaused: false })
+    })
+    report.steps.push('shader')
+    if (report.shader.status !== 'drawn') throw new Error(`shader: ${report.shader.status}`)
+  }
+
   // The tree, in the site the engine's own wrapper would give it.
   // The tree is drawn as given. Desktop's own check runs on the wire form the CLI sends, which this input is not.
   const tree = input.tree ?? sample

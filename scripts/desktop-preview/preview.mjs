@@ -8,9 +8,11 @@
 //                         [--timeline <timeline.json> | --times <ms,ms,...>] [--reduced-motion] [--video]
 //                         [--shots <dir>] [--modes light,dark] [--size 1628x1348]
 //                         [--asar <ion-dist.asar>] [--cache <dir>] [--port <n>]
+//                         [--shader <plugin dir>]
 // With --shots it captures each mode and exits; without it, it serves until stopped.
 // With --timeline or --times it captures one PNG per frame, with every animation paused at the frame's time.
-import { execFileSync, spawnSync } from 'node:child_process'
+// With --shader it asks the CLI for the Shader the plugin's Backdrop hook draws and plays it in the app's own worker.
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import http from 'node:http'
 import os from 'node:os'
@@ -123,6 +125,66 @@ export function makeVideo(files, times, out) {
   return out
 }
 
+/**
+ * Asks the CLI for the Shader a plugin's Backdrop hook draws, as the desktop app does: ui_attach naming Theme and
+ * Shader, then ui_render of the Theme backdrop. It sends no user message, so no model turn runs, and it reads no user
+ * settings, so only the given plugin's hooks answer. The plugin is loaded
+ * from a temporary copy, so nothing the CLI writes lands in its folder. `command` replaces `claude` in tests.
+ * Returns { ir, values, svg, cli }.
+ */
+export async function fetchShader({ pluginDir, theme = null, command = ['claude'], timeoutMs = 60000 }) {
+  const manifest = path.join(pluginDir, '.claude-plugin', 'plugin.json')
+  if (!fs.existsSync(manifest)) throw new Error(`--shader needs a plugin folder with .claude-plugin/plugin.json: ${pluginDir}`)
+  const name = JSON.parse(fs.readFileSync(manifest, 'utf8')).name
+  const props = { ...theme?.backdrop, scene: theme?.backdrop?.scene ?? name, plugin: theme?.backdrop?.plugin ?? name }
+  const [cmd, ...pre] = command
+  const cli = execFileSync(cmd, [...pre, '--version'], { encoding: 'utf8' }).trim()
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'mod-kit-preview-shader-'))
+  const copy = path.join(work, name.replace(/[^\w-]/g, '_'))
+  fs.cpSync(pluginDir, copy, { recursive: true, filter: (f) => !/[\\/](\.git|node_modules)$/.test(f) })
+  // Project settings only, in an empty folder: the user's enabled plugins stay off, so an installed theme cannot answer
+  // for this one. --bare would turn off the --plugin-dir mod too (2.1.330).
+  const p = spawn(cmd, [...pre, '-p', '--setting-sources', 'project', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--no-session-persistence', '--plugin-dir', copy], { cwd: work, stdio: ['pipe', 'pipe', 'pipe'] })
+  const waiting = new Map()
+  let buf = '', err = ''
+  const gone = new Promise((_, no) => {
+    p.on('error', no)
+    p.on('exit', (code) => no(new Error(`the CLI exited with ${code} before it answered: ${err.trim().slice(-400)}`)))
+    setTimeout(() => no(new Error(`the CLI did not answer within ${timeoutMs / 1000} s`)), timeoutMs).unref()
+  })
+  gone.catch(() => {})
+  p.stderr.on('data', (d) => { err += d })
+  p.stdout.on('data', (d) => {
+    buf += d
+    for (let i; (i = buf.indexOf('\n')) >= 0;) {
+      const line = buf.slice(0, i); buf = buf.slice(i + 1)
+      let j; try { j = JSON.parse(line) } catch { continue }
+      const r = j.type === 'control_response' && j.response
+      if (r && waiting.has(r.request_id)) { waiting.get(r.request_id)(r); waiting.delete(r.request_id) }
+    }
+  })
+  const ask = (id, request) => {
+    const answer = new Promise((ok) => waiting.set(id, ok))
+    p.stdin.write(`${JSON.stringify({ type: 'control_request', request_id: id, request })}\n`)
+    return Promise.race([answer, gone]).then((r) => { if (r.subtype !== 'success') throw new Error(`the CLI refused ${request.subtype}: ${r.error ?? JSON.stringify(r).slice(0, 300)}`); return r.response })
+  }
+  try {
+    const client = { surface: 'desktop', client_id: 'mod-kit-preview' }
+    await ask('init', { subtype: 'initialize' })
+    await ask('attach', { subtype: 'ui_attach', ...client, draws: ['Theme', 'Shader'] })
+    const { tree } = await ask('backdrop', { subtype: 'ui_render', ...client, component: 'Theme', instance_id: 'backdrop', props })
+    if (tree?.type !== 'Shader' || !tree.props?.ir) throw new Error(`the Backdrop hook of ${name} answered ${tree?.type ?? 'nothing'}, not a Shader, for props ${JSON.stringify(props)}`)
+    const svg = tree.children?.find((c) => c?.type === 'Svg')?.props?.source
+    if (typeof svg !== 'string') throw new Error(`the Shader of ${name} holds no Svg`)
+    return { ir: tree.props.ir, values: tree.props.values ?? [], svg, cli }
+  } finally {
+    p.stdin.end()
+    try { process.platform === 'win32' ? execFileSync('taskkill', ['/T', '/F', '/PID', String(p.pid)], { stdio: 'ignore' }) : p.kill('SIGKILL') } catch {}
+    await new Promise((ok) => setTimeout(ok, 500))
+    fs.rmSync(work, { recursive: true, force: true, maxRetries: 5 })
+  }
+}
+
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.otf': 'font/otf', '.png': 'image/png', '.webp': 'image/webp', '.ico': 'image/x-icon' }
 
 /** Serves the page, the extracted bundle and the inputs on 127.0.0.1 only, and answers only requests addressed to it. */
@@ -164,6 +226,13 @@ async function main(argv) {
   console.log(`Claude Desktop ${version}: engine ${found.engineFile}, sites ${found.sitesFile}, theme ${found.themeFile}`)
   console.log(`cache ${cache}`)
   const input = readInput({ tree: arg('tree'), site: arg('site'), theme: arg('theme'), settings: arg('settings'), timeline: arg('timeline'), times: arg('times') })
+  if (arg('shader')) {
+    if (input.frames) throw new Error('--shader takes no --timeline or --times')
+    if (!found.shader) throw new Error('anchor "shader-worker" not found: no PointerBackdrop chunk names an existing /assets/shader-worker-*.js in this Desktop build')
+    const s = await fetchShader({ pluginDir: path.resolve(arg('shader')), theme: input.theme })
+    input.shader = { ...s, worker: found.shader.worker, desktop: version }
+    console.log(`shader worker ${found.shader.worker} (started by ${found.shader.backdropFile}), ${s.cli}`)
+  }
   const shots = arg('shots')
   const server = await startServer({ bundle, input, saveDir: shots ? path.resolve(shots) : path.join(cache, 'out'), port: Number(arg('port', shots ? 0 : 4173)) })
   const base = `http://127.0.0.1:${server.address().port}`
@@ -179,6 +248,10 @@ async function main(argv) {
   try {
     const results = await capture(list, out, w, h, { reducedMotion })
     for (const r of results) { console.log(`${r.file}\t${r.status}\t${r.sha256}`); failed ||= r.status !== 'ok' }
+    if (input.shader) for (const m of modes) {
+      const s = JSON.parse(fs.readFileSync(path.join(out, `preview-${m}.json`), 'utf8')).shader
+      console.log(`shader ${m}: ${s?.status}; messages ${s?.messages.map((x) => JSON.stringify(x.msg ?? x.error)).join(' ')}; frost mean ${s?.frost?.mean.join(',') ?? 'none'}; GPU ${s?.gpu}`)
+    }
     if (input.frames) {
       fs.writeFileSync(path.join(out, 'frames.json'), JSON.stringify({ reducedMotion, frames: results }, null, 1))
       if (argv.includes('--video')) for (const m of modes) {

@@ -51,7 +51,11 @@ export function locate(bundle) {
   const index = read(path.join(bundle, 'index.html'))
   const linked = [...index.matchAll(/<link rel="stylesheet"[^>]*href="([^"]+)"/g)].map((m) => m[1])
   const extra = fs.readdirSync(v1).filter((f) => f.endsWith('.css')).filter((f) => { const s = read(path.join(v1, f)); return s.includes('epitaxy-fence') || s.includes('engine-glass-opacity') }).map((f) => `/assets/v1/${f}`)
-  const out = { engineFile, sitesFile, themeFile, sheets: [...new Set([...linked, ...extra])], names: n }
+  // The Shader player: the module worker the PointerBackdrop chunk starts. Optional, as only --shader needs it.
+  const backdropFile = firstFile(v1, '.js', '/assets/shader-worker-', 'PointerBackdrop')
+  const worker = backdropFile && /"(\/assets\/shader-worker-[\w-]+\.js)"/.exec(read(path.join(v1, backdropFile)))?.[1]
+  const shader = worker && fs.existsSync(path.join(bundle, worker)) ? { backdropFile, worker } : null
+  const out = { engineFile, sitesFile, themeFile, sheets: [...new Set([...linked, ...extra])], names: n, shader }
   fs.writeFileSync(path.join(bundle, '__preview-names.json'), JSON.stringify(out, null, 1))
   return out
 }

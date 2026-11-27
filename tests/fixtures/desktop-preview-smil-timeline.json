@@ -1,0 +1,26 @@
+{
+ "_comment": "Hand-written. Each Svg moves a 20 px square from x=0 to x=100 in 1 s, linear, frozen at the end, so x = min(svgTime / 10, 100). The first Svg is interactive (a sandboxed document), the second an image. The frame at 2000 gives a changed tree (columnGap 2), a redraw, so its Svg clock starts over and x = 0.",
+ "site": "band",
+ "frames": [
+  {
+   "t": 0,
+   "tree": {
+    "type": "Box",
+    "props": { "flexDirection": "row", "columnGap": 1 },
+    "children": [
+     { "type": "Svg", "props": { "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"20\" viewBox=\"0 0 200 20\"><rect width=\"200\" height=\"20\" fill=\"#00ff00\"/><rect id=\"interactive\" x=\"0\" y=\"0\" width=\"20\" height=\"20\" fill=\"#ff0000\"><animate attributeName=\"x\" from=\"0\" to=\"100\" dur=\"1s\" begin=\"0s\" fill=\"freeze\"/></rect></svg>", "alt": "a red square moving right", "isInteractive": true } },
+     { "type": "Svg", "props": { "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"20\" viewBox=\"0 0 200 20\"><rect width=\"200\" height=\"20\" fill=\"#ffff00\"/><rect id=\"image\" x=\"0\" y=\"0\" width=\"20\" height=\"20\" fill=\"#0000ff\"><animate attributeName=\"x\" from=\"0\" to=\"100\" dur=\"1s\" begin=\"0s\" fill=\"freeze\"/></rect></svg>", "alt": "a blue square moving right" } }
+    ]
+   }
+  },
+  { "t": 250 },
+  { "t": 500 },
+  { "t": 750 },
+  { "t": 1000 },
+  { "t": 1500 },
+  { "t": 2000, "tree": { "type": "Box", "props": { "flexDirection": "row", "columnGap": 2 }, "children": [
+     { "type": "Svg", "props": { "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"20\" viewBox=\"0 0 200 20\"><rect width=\"200\" height=\"20\" fill=\"#00ff00\"/><rect id=\"interactive\" x=\"0\" y=\"0\" width=\"20\" height=\"20\" fill=\"#ff0000\"><animate attributeName=\"x\" from=\"0\" to=\"100\" dur=\"1s\" begin=\"0s\" fill=\"freeze\"/></rect></svg>", "alt": "a red square moving right", "isInteractive": true } },
+     { "type": "Svg", "props": { "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"20\" viewBox=\"0 0 200 20\"><rect width=\"200\" height=\"20\" fill=\"#ffff00\"/><rect id=\"image\" x=\"0\" y=\"0\" width=\"20\" height=\"20\" fill=\"#0000ff\"><animate attributeName=\"x\" from=\"0\" to=\"100\" dur=\"1s\" begin=\"0s\" fill=\"freeze\"/></rect></svg>", "alt": "a blue square moving right" } }
+    ] } }
+ ]
+}

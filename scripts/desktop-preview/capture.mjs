@@ -51,12 +51,14 @@ export async function capture(shots, outDir, width, height, { reducedMotion = fa
   const results = []
   let ws
   try {
+    // A cold start on a CI runner takes close to 20 s, so the wait is 60 s.
+    let timer
     const wsUrl = await new Promise((ok, no) => {
       let buf = ''
       proc.stderr.on('data', (d) => { buf += d; const m = /ws:\/\/\S+/.exec(buf); if (m) ok(m[0]) })
       proc.on('exit', (code, signal) => no(new Error(`browser exited with ${code ?? signal} before DevTools started: ${buf.trim().slice(-400)}`)))
-      setTimeout(() => no(new Error(`no DevTools URL within 20 s: ${buf.trim().slice(-400)}`)), 20000)
-    })
+      timer = setTimeout(() => no(new Error(`no DevTools URL within 60 s: ${buf.trim().slice(-400)}`)), 60000)
+    }).finally(() => clearTimeout(timer))
     ws = new WebSocket(wsUrl)
     await new Promise((ok, no) => { ws.addEventListener('open', ok); ws.addEventListener('error', no) })
     let id = 0
